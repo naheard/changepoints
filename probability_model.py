@@ -8,10 +8,10 @@ class ProbabilityModel(ABC):
         self.data=data
         self.parameters=parameters
 
-    def likelihood(self,start=0,end=None):
+    def likelihood(self,start_end=[(0,None)]):
         lhd=0
         for j in range(self.data.p):
-            lhd+=self.likelihood_j(j,start,end)
+            lhd+=self.likelihood_j(j,start_end)
 
         return(lhd)
 
@@ -21,14 +21,14 @@ class ProbabilityModel(ABC):
         len_tau=len(tau)
         for i in range(len_tau+1):
             end=self.data.find_position(tau[i]) if i<len_tau else self.data.n
-            lhd+=self.likelihood(start,end)
+            lhd+=self.likelihood([(start,end)])
             start=end
 
         return(lhd)
 
     @abstractmethod
-    def likelihood_j(self,j=0,start=0,end=None):
-        pass
+    def likelihood_j(self,j=0,start_end=[(0,None)]):
+        pass #A likelihood fucntion for the jth row of data.y, taking several slices starting and ending at the positions of start_end
 
     def find_data_position(self,t):
         if self.data is None:

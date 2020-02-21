@@ -63,9 +63,12 @@ class Data(object):
                 self.cum_counts[j][cat_ji,i]+=1
 
     def get_y_cumulative_counts(self,dim=0,start=0,end=None):
-        start_cts=np.zeros(self.num_categories[dim]) if start==0 else self.cum_counts[dim][:,(start-1)]
+        start_cts=np.zeros(self.num_categories[dim],dtype=int) if start==0 else self.cum_counts[dim][:,(start-1)]
         end_cts=self.cum_counts[dim][:,self.n-1] if (end is None or end>=self.n) else self.cum_counts[dim][:,end]
         return(end_cts-start_cts)
+
+    def get_combined_y_cumulative_counts(self,dim=0,start_end=[(0,None)]):
+        return(np.sum([self.get_y_cumulative_counts(dim,start,end) for start,end in start_end],axis=0))
 
     def get_x_max(self):
         return(self.n-1 if self.x is None else max(self.x))
