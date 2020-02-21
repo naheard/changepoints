@@ -1,7 +1,7 @@
 from probability_model import ProbabilityModel
 from data import Data
 import numpy as np
-import sys
+from collections import defaultdict
 
 class Changepoint(object):
     def __init__(self,t,probability_models=None):
@@ -28,17 +28,19 @@ class ChangepointModel(object):
         self.num_probability_models=len(self.probability_models)
         self.T=max([pm.data.get_x_max() for pm in self.probability_models if pm.data is not None])
         self.baseline_changepoint=Changepoint(-float("inf"),self.probability_models)
-        self.cps=np.array([self.baseline_changepoint],dtype=Changepoint)#empty vector of changepoints
-        self.regimes=np.arange(len(self.cps))
-        self.num_regimes=max(self.regimes)+1
+        self.set_changepoints([])
         self.lhds=np.array([pm.likelihood() for pm in self.probability_models])#vector of likelihoods, one for each probability model
 
     def get_lhd(self):
         return(sum(self.lhds))
 
     def set_changepoints(self,tau):
-        self.cps=np.sort(np.array([self.baseline_changepoint]+[Changepoint(t) for t in tau]))
-        self.regimes=np.arange(len(self.cps))
+        self.cps=np.sort(np.array([self.baseline_changepoint]+[Changepoint(t) for t in tau],dtype=Changepoint))
+        self.num_cps=len(self.cps)
+        self.regimes=[[i] for i in range(self.num_cps)]
+        self.num_regimes=len(self.regimes)
+#        self.regimes=np.arange(len(self.cps))
+#        self.num_regimes=max(self.regimes)+1
 
     def find_position_in_changepoints(self,t):
         position=np.searchsorted(self.cps,Changepoint(t))
