@@ -4,7 +4,7 @@ from multinomial_dirichlet import MultinomialDirichlet
 from changepoint_model import ChangepointModel
 import numpy as np
 
-dat=Data.from_arguments('y.txt','x.txt',int,float)
+dat=Data.from_arguments('y.txt','x.txt',dtype=int,xdtype=float)
 md=MultinomialDirichlet(dat,alpha=.01)
 tau=np.loadtxt('tau.txt')
 #print(md.changepoint_likelihood(tau=tau))

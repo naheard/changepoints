@@ -19,7 +19,11 @@ class Data(object):
         return(cls(y,x,transpose))
 
     def find_position(self,t):
-        position=int(ceil(t)) if self.x is None else np.searchsorted(self.x,t)
+        if t==-float("inf"):
+            return(0)
+        elif t==float("inf"):
+            return(n)
+        position=int(np.ceil(t)) if self.x is None else np.searchsorted(self.x,t)
         return(position)
 
     def calculate_y_cumulative_sum(self):
