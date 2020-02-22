@@ -41,10 +41,13 @@ class ChangepointModel(object):
     def get_lhd(self):
         return(sum(self.lhds))
 
-    def set_changepoints(self,tau):
+    def set_changepoints(self,tau,regimes=None):
         self.cps=np.sort(np.array([self.baseline_changepoint]+[Changepoint(t,self.probability_models) for t in tau],dtype=Changepoint))
         self.num_cps=len(self.cps)
-        self.regimes=[[_] for _ in range(self.num_cps)]
+        if regimes is None:
+            self.regimes=[[_] for _ in range(self.num_cps)]
+        else:
+            self.regimes=regimes
         self.num_regimes=len(self.regimes)
 #        self.regimes=np.arange(len(self.cps))
 #        self.num_regimes=max(self.regimes)+1
