@@ -4,15 +4,14 @@ import numpy as np
 import sys
 
 class Changepoint(object):
-    def __init__(self,t,probability_models=None):
+    def __init__(self,t,probability_models=None,regime=None):
         self.tau=t
         self.probability_models=probability_models
         if probability_models is not None:
             self.data_locations=self.find_data_positions()
 #        self.lhds=np.array([],dtype=float)#empty vector of likelihoods, one for each probability model
 #        self.indicators=None
-        self.regime=None
-
+        self.regime=regime
 
     def find_data_positions(self,t=None):
         t=t if t is not None else self.tau
@@ -21,6 +20,7 @@ class Changepoint(object):
 
     def __lt__(self,other):
         return(self.tau<other.tau)
+
 
 class ChangepointModel(object):
     def __init__(self,probability_models=np.array([],dtype=ProbabilityModel)):
@@ -70,25 +70,56 @@ class ChangepointModel(object):
             for cp_i in self.regimes[r_i]:
                 self.cps[cp_i].regime-=1
         del self.regimes[regime_index]
+        self.num_regimes-=1
+
+    def add_regime(self,cp_indices):
+        self.regimes.append(cp_indices)
+        self.num_regimes+=1
+        hold=self.regime_lhds
+        self.regime_lhds=np.array([np.zeros(self.num_regimes) for pm in self.probability_models])
+        self.regime_lhds[:,:-1]=hold
+#        for pm_i in range(self.num_probability_models):
+#            self.regime_lhds[pm_i]=np.append(self.regime_lhds[pm_i],0)
+
+    def add_changepoint_index_to_regime(self,regime,index):
+        if regime==self.num_regimes:
+            self.add_regime([index])
+        else:
+            self.regimes[regime]=np.insert(self.regimes[regime],np.searchsorted(self.regimes[regime],index),index)
 
     def delete_changepoint(self,index):
         if index==0:
             sys.exit('Error! Cannot delete basline changepoint')
-        r_i=self.cps[index].regime
-        if len(self.regimes[r_i])==1:
-            self.delete_regime(r_i)
+        regime_i=self.cps[index].regime
+        if len(self.regimes[regime_i])==1:
+            self.delete_regime(regime_i)
         else:
-            del self.regimes[r_i][index]
+            del self.regimes[regime_i][index]
         self.cps=np.delete(self.cps,index)
+        self.num_cps-=1
+        for r in self.regimes:
+            for i in range(len(r)):
+                if r[i]>index:
+                    r[i]-=1
 
     def add_changepoint(self,t,regime=None):
-        position=self.find_position_in_changepoints(t)
+        index=self.find_position_in_changepoints(t)
+        self.cps=np.insert(self.cps,index,Changepoint(t,self.probability_models,regime))
+        self.num_cps+=1
+        for r in self.regimes:
+            for i in range(len(r)):
+                if r[i]>=index:
+                    r[i]+=1
+        if regime is None:
+            regime=self.num_regimes
+        self.add_changepoint_index_to_regime(regime,index)
 
     def calculate_likelihood(self):
         self.regime_lhds=np.array([np.zeros(self.num_regimes) for pm in self.probability_models])
         for pm_i in range(self.num_probability_models):
             for r_i in range(self.num_regimes):
                 start_end=[self.get_changepoint_index_segment_start_end(pm_i,j) for j in self.regimes[r_i]]
+                print(r_i,start_end)
                 self.regime_lhds[pm_i][r_i]=self.probability_models[pm_i].likelihood(start_end)
         self.lhds=np.array([sum(self.regime_lhds[pm_i]) for pm_i in range(self.num_probability_models)],dtype=float)
         return(sum(self.lhds))
