@@ -59,6 +59,9 @@ class ChangepointModel(object):
         position=np.searchsorted(self.cps,Changepoint(t))
         return(position)
 
+    def write_changepoints_and_regimes(self,stream=sys.stdout,delim="\t"):
+        stream.write(delim.join([":".join(map(str,(cp.tau,cp.regime))) for cp in self.cps])+"\n")
+
     def delete_regime(self,regime_index):
         for pm_i in range(self.num_probability_models):
             np.delete(self.regime_lhds[pm_i],regime_index)
