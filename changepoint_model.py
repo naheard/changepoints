@@ -93,6 +93,9 @@ class ChangepointModel(object):
         regime_index=self.find_position_in_regimes(cp_indices)
         self.regimes.insert(regime_index,Regime(cp_indices))
         self.num_regimes+=1
+        for i in cp_indices:
+            self.cps[i].regime_number=regime_index
+
         for pm_i in range(self.num_probability_models):
             self.regime_lhds[pm_i].insert(regime_index,0)
 
@@ -123,14 +126,14 @@ class ChangepointModel(object):
 
     def add_changepoint(self,t,regime_number=None):
         index=self.find_position_in_changepoints(t)
-        if regime_number is None:
-            regime_number=self.num_regimes
         self.cps=np.insert(self.cps,index,Changepoint(t,self.probability_models,regime_number))
         self.num_cps+=1
         for r in self.regimes:
             for i in range(r.length()):
                 if r.cp_indices[i]>=index:
                     r.cp_indices[i]+=1
+        if regime_number is None:
+            regime_number=self.num_regimes
         self.add_changepoint_index_to_regime(index,regime_number)
 
     def shift_changepoint(self,index,t):
