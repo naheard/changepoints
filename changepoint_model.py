@@ -30,7 +30,7 @@ class ChangepointModel(object):
         self.baseline_changepoint=Changepoint(-float("inf"),self.probability_models)
         self.set_changepoints([])
         self.regime_lhds=np.array([[] for pm in self.probability_models])
-        self.lhds=np.array([pm.likelihood() for pm in self.probability_models])#vector of likelihoods, one for each probability model
+        self.lhds=np.array([pm.likelihood() for pm in self.probability_models])#likelihoods for each prob. model
         self.likelihood()
 
     def get_changepoint_index_segment_start_end(self,pm_index,index):
@@ -80,6 +80,9 @@ class ChangepointModel(object):
         else:
             del self.regimes[r_i][index]
         self.cps=np.delete(self.cps,index)
+
+    def add_changepoint(self,t,regime=None):
+        position=self.find_position_in_changepoints(t)
 
     def calculate_likelihood(self):
         self.regime_lhds=np.array([np.zeros(self.num_regimes) for pm in self.probability_models])
