@@ -159,3 +159,6 @@ class ChangepointModel(object):
                 self.regime_lhds[pm_i][r_i]=self.probability_models[pm_i].likelihood(start_end)
         self.lhds=np.array([sum(self.regime_lhds[pm_i]) for pm_i in range(self.num_probability_models)],dtype=float)
         return(sum(self.lhds))
+
+    def get_effective_changepoint_locations(self):
+        return([self.cps[i+1].tau for i in range(self.num_cps-1) if self.cps[i+1].regime_number!=self.cps[i].regime_number])
