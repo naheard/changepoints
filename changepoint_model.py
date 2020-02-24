@@ -9,15 +9,14 @@ class Changepoint(object):
         self.tau=t
         self.probability_models=probability_models
         if probability_models is not None:
-            self.data_locations=self.find_data_positions()
+            self.find_data_positions()
 #        self.lhds=np.array([],dtype=float)#empty vector of likelihoods, one for each probability model
 #        self.indicators=None
         self.regime_number=regime_number
 
     def find_data_positions(self,t=None):
         t=t if t is not None else self.tau
-        positions=np.array([pm.find_data_position(t) for pm in self.probability_models],dtype=int)
-        return(positions)
+        self.data_locations=np.array([pm.find_data_position(t) for pm in self.probability_models],dtype=int)
 
     def __lt__(self,other):
         return(self.tau<other.tau)
@@ -133,6 +132,10 @@ class ChangepointModel(object):
                 if r.cp_indices[i]>=index:
                     r.cp_indices[i]+=1
         self.add_changepoint_index_to_regime(index,regime_number)
+
+    def shift_changepoint(self,index,t):
+        self.cps[index].tau=t
+        self.cps[index].find_data_positions()
 
     def change_regime_of_changepoint(self,index,new_regime_number):
         regime_number=self.cps[index].regime_number
