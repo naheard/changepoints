@@ -95,13 +95,13 @@ class ChangepointModel(object):
         self.regimes.insert(regime_index,Regime(cp_indices))
         self.num_regimes+=1
         for pm_i in range(self.num_probability_models):
-            self.regime_lhds[pm_i].append(0)
+            self.regime_lhds[pm_i].insert(regime_index,0)
 
         for r_i in range(regime_index+1,self.num_regimes):
             for cp_i in self.regimes[r_i].cp_indices:
                 self.cps[cp_i].regime_number+=1
 
-    def add_changepoint_index_to_regime(self,regime_number,index):
+    def add_changepoint_index_to_regime(self,index,regime_number):
         if regime_number==self.num_regimes:
             self.add_regime([index])
         else:
@@ -124,15 +124,25 @@ class ChangepointModel(object):
 
     def add_changepoint(self,t,regime_number=None):
         index=self.find_position_in_changepoints(t)
+        if regime_number is None:
+            regime_number=self.num_regimes
         self.cps=np.insert(self.cps,index,Changepoint(t,self.probability_models,regime_number))
         self.num_cps+=1
         for r in self.regimes:
             for i in range(r.length()):
                 if r.cp_indices[i]>=index:
                     r.cp_indices[i]+=1
-        if regime_number is None:
-            regime_number=self.num_regimes
-        self.add_changepoint_index_to_regime(regime_number,index)
+        self.add_changepoint_index_to_regime(index,regime_number)
+
+    def change_regime_of_changepoint(self,index,new_regime_number):
+        regime_number=self.cps[index].regime_number
+        if self.regimes[regime_number].length()==1:
+            self.delete_regime(regime_number)
+            if regime_number<new_regime_number:
+                new_regime_number-=1
+        else:
+            self.regimes[regime_number].remove_cp_index(index)
+        self.add_changepoint_index_to_regime(index,new_regime_number)
 
     def calculate_likelihood(self):
         for pm_i in range(self.num_probability_models):
