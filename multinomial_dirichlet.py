@@ -18,7 +18,12 @@ class MultinomialDirichlet(ProbabilityModel):
 
     def likelihood_j(self,j=0,start_end=[(0,None)],y=None):
         counts=y if y is not None else self.data.get_combined_y_cumulative_counts(j,start_end)
-        alpha_dot,n_dot=self.alpha_dots[j],sum(counts)
-        lhd_terms=np.array([0.0 if c_k==0 else gammaln(a_k+c_k)-gammaln(a_k) for (a_k,c_k) in zip(self.alphas[j],counts)])
+        return(self.log_density(counts,self.alphas[j],self.alpha_dots[j]))
+
+    def log_density(self,counts,alphas,alpha_dot=None):
+        n_dot=sum(counts)
+        if alpha_dot is None:
+            alpha_dot=sum(alphas)
+        lhd_terms=np.array([0.0 if c_k==0 else gammaln(a_k+c_k)-gammaln(a_k) for (a_k,c_k) in zip(alphas,counts)])
         const=-n_dot*np.log(n_dot) if (alpha_dot==0) else gammaln(alpha_dot)-gammaln(alpha_dot+n_dot)
         return(sum(lhd_terms)+const)
