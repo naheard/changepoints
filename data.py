@@ -36,15 +36,24 @@ class Data(object):
         self.Sx=np.cumsum(self.x)
 
     @staticmethod
-    def get_sum_between(mx,start,end):
-        return(mx[:,end-1]-(mx[:,start-1] if start>0 else 0))
+    def get_sum_between(mx,start,end,j=None):
+        if j is None:
+            return(mx[:,end-1]-(mx[:,start-1] if start>0 else 0))
+        else:
+            return(mx[j,end-1]-(mx[j,start-1] if start>0 else 0))
 
-    def get_ysum_between(self,start,end):
+    def get_y_sum_between(self,start,end,j=None):
         #return sum of y[start:end]
         if self.Sy is not None:
-            return(self.get_sum_between(self.Sy,start,end))
+            return(self.get_sum_between(self.Sy,start,end,j))
         else:
-            return(np.sum(self.y[:,start:end],axis=1))
+            if j is None:
+                return(np.sum(self.y[:,start:end],axis=1))
+            else:
+                return(np.sum(self.y[j,start:end],axis=1))
+
+    def get_combined_y_sums(self,dim=0,start_end=[(0,None)]):
+        return(np.sum([self.get_y_sum_between(start,end,dim) for start,end in start_end],axis=0))
 
     def calculate_unique_categories(self):
         self.categories=[{} for j in range(self.p)]

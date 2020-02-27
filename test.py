@@ -1,14 +1,16 @@
 #! /usr/bin/env python3
 from data import Data
 from multinomial_dirichlet import MultinomialDirichlet
+from poisson_gamma import PoissonGamma
 from changepoint_model import ChangepointModel
 import numpy as np
 
 dat=Data.from_arguments('y.txt','x.txt',dtype=int,xdtype=float)
 md=MultinomialDirichlet(dat,alpha=.01)
+pg=PoissonGamma(dat,alpha_beta=[.01,.01])
 tau=np.loadtxt('tau.txt')
 #print(md.changepoint_likelihood(tau=tau))
-cpm=ChangepointModel([md,md])
+cpm=ChangepointModel([md,pg])
 print(cpm.calculate_likelihood())
 cpm.set_changepoints(tau,[[0],[1],[2],[3],[4],[5]])
 cpm.write_changepoints_and_regimes()

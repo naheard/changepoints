@@ -162,3 +162,6 @@ class ChangepointModel(object):
 
     def get_effective_changepoint_locations(self):
         return([self.cps[i+1].tau for i in range(self.num_cps-1) if self.cps[i+1].regime_number!=self.cps[i].regime_number])
+
+    def calculate_prior(self):
+        return(0)
