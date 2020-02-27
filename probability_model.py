@@ -14,7 +14,7 @@ class ProbabilityModel(ABC):
             for j in range(self.data.p):
                 lhd+=self.likelihood_j(j,start_end)
         else:
-            lhd=likelihood_j(self,0,y=y)
+            lhd=self.likelihood_j(self,0,y=y)
 
         return(lhd)
 

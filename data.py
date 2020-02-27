@@ -33,10 +33,11 @@ class Data(object):
         self.Sy2=np.cumsum(self.y*self.y,axis=1)
 
     def calculate_x_cumulative_sum(self):
-        self.Sx=np.cumsum(self.x)
+        if self.x is not None:
+            self.Sx=np.cumsum(self.x)
 
     @staticmethod
-    def get_sum_between(mx,start,end,j=None):
+    def get_diff_between(mx,start,end,j=None):
         if j is None:
             return(mx[:,end-1]-(mx[:,start-1] if start>0 else 0))
         else:
@@ -45,15 +46,28 @@ class Data(object):
     def get_y_sum_between(self,start,end,j=None):
         #return sum of y[start:end]
         if self.Sy is not None:
-            return(self.get_sum_between(self.Sy,start,end,j))
+            return(self.get_diff_between(self.Sy,start,end,j))
         else:
             if j is None:
                 return(np.sum(self.y[:,start:end],axis=1))
             else:
                 return(np.sum(self.y[j,start:end],axis=1))
 
+    def get_x_sum_between(self,start,end):
+        #return sum of x[start:end]
+        if self.Sx is not None:
+            return(self.get_diff_between(self.Sx,start,end,j))
+        else:
+            if self.x is None:
+                return(end-start)
+            else:
+                return(np.sum(self.x[start:end],axis=1))
+
     def get_combined_y_sums(self,dim=0,start_end=[(0,None)]):
         return(np.sum([self.get_y_sum_between(start,end,dim) for start,end in start_end],axis=0))
+
+    def get_combined_x_sums(self,start_end=[(0,None)]):
+        return(np.sum([self.get_x_sum_between(start,end) for start,end in start_end],axis=0))
 
     def calculate_unique_categories(self):
         self.categories=[{} for j in range(self.p)]

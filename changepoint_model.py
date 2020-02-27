@@ -3,6 +3,8 @@ from data import Data
 import numpy as np
 import sys
 from collections import defaultdict
+from poisson_gamma import PoissonGamma
+from regime_model import RegimeModel
 
 class Changepoint(object):
     def __init__(self,t,probability_models=None,regime_number=None):
@@ -43,6 +45,8 @@ class ChangepointModel(object):
         self.probability_models=probability_models
         self.num_probability_models=len(self.probability_models)
         self.T=max([pm.data.get_x_max() for pm in self.probability_models if pm.data is not None])
+        self.changepoint_prior=PoissonGamma(alpha_beta=[.1,.1])
+        self.regimes_prior=RegimeModel()
         self.baseline_changepoint=Changepoint(-float("inf"),self.probability_models)
         self.set_changepoints([])
         self.regime_lhds=defaultdict(list)
@@ -164,4 +168,7 @@ class ChangepointModel(object):
         return([self.cps[i+1].tau for i in range(self.num_cps-1) if self.cps[i+1].regime_number!=self.cps[i].regime_number])
 
     def calculate_prior(self):
-        return(0)
+        prior=self.changepoint_prior.likelihood(y=self.num_cps-1)
+        self.regime_sequence=[self.cps[i].regime_number for i in range(self.num_cps)]
+        prior+=self.regimes_prior.likelihood(y=self.regime_sequence)
+        return(prior)
