@@ -144,6 +144,20 @@ class ChangepointModel(object):
         self.cps[index].tau=t
         self.cps[index].find_data_positions()
 
+    def change_changepoint_regime(self,cp_index,regime_number):
+        if cp_index==0:#cannot change first segment from regime 0
+            exit()
+        if regime_number>self.num_regimes:#new regime
+            self.add_regime([cp_index])
+            self.regimes[self.cps[cp_index].regime_number].remove_cp_index(cp_index)
+        else:
+            if self.regimes[self.cps[cp_index].regime_number].length()==1:
+                self.delete_regime(self.cps[cp_index].regime_number)
+            else:
+                self.regimes[self.cps[cp_index].regime_number].remove_cp_index(cp_index)
+                self.insert_cp_index(cp_index)
+        self.cps[cp_index].regime_number=regime_number
+
     def change_regime_of_changepoint(self,index,new_regime_number):
         regime_number=self.cps[index].regime_number
         if self.regimes[regime_number].length()==1:
