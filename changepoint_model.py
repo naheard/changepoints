@@ -12,7 +12,6 @@ class Changepoint(object):
         self.probability_models=probability_models
         if probability_models is not None:
             self.find_data_positions()
-#        self.lhds=np.array([],dtype=float)#empty vector of likelihoods, one for each probability model
 #        self.indicators=None
         self.regime_number=regime_number
 
@@ -52,7 +51,7 @@ class ChangepointModel(object):
         self.regimes_prior=RegimeModel()
         self.baseline_changepoint=Changepoint(-float("inf"),self.probability_models)
         self.set_changepoints([])
-        self.regime_lhds=defaultdict(list)
+        self.regime_lhds=[np.zeros(self.num_probability_models) for _ in range(self.num_regimes)]
         self.calculate_posterior()#calculate likelihoods for each prob. model
         self.create_mh_dictionary()
         self.proposal_move_counts=Counter()
@@ -75,9 +74,6 @@ class ChangepointModel(object):
     def distance_to_rh_cp(self,index):
         rh_cp_location=self.T if index==self.num_cps else self.cps[index+1].tau
         return(rh_cp_location-self.cps[index].tau)
-
-    def get_lhd(self):
-        return(sum(self.lhds))
 
     def set_changepoints(self,tau,regimes=None):
         self.cps=np.sort(np.array([self.baseline_changepoint]+[Changepoint(t,self.probability_models) for t in tau],dtype=Changepoint))
@@ -103,9 +99,7 @@ class ChangepointModel(object):
         stream.write(delim.join([":".join(map(str,(cp.tau,cp.regime_number))) for cp in self.cps])+"\n")
 
     def delete_regime(self,regime_index):
-        for pm_i in range(self.num_probability_models):
-            del self.regime_lhds[pm_i][regime_index]
-
+        del self.regime_lhds[regime_index]
         for r_i in range(regime_index+1,self.num_regimes):
             for cp_i in self.regimes[r_i].cp_indices:
                 self.cps[cp_i].regime_number-=1
@@ -119,9 +113,7 @@ class ChangepointModel(object):
         for i in cp_indices:
             self.cps[i].regime_number=regime_index
 
-        for pm_i in range(self.num_probability_models):
-            self.regime_lhds[pm_i].insert(regime_index,0)
-
+        self.regime_lhds.insert(regime_index,np.zeros(self.num_probability_models))
         for r_i in range(regime_index+1,self.num_regimes):
             for cp_i in self.regimes[r_i].cp_indices:
                 self.cps[cp_i].regime_number+=1
@@ -175,14 +167,12 @@ class ChangepointModel(object):
         self.add_changepoint_index_to_regime(index,new_regime_number)
 
     def calculate_likelihood(self):
-        for pm_i in range(self.num_probability_models):
-            self.regime_lhds[pm_i]=[0]*self.num_regimes
-            for r_i in range(self.num_regimes):
+        for r_i in range(self.num_regimes):
+            for pm_i in range(self.num_probability_models):
                 start_end=[self.get_changepoint_index_segment_start_end(pm_i,j) for j in self.regimes[r_i].cp_indices]
 #                print(r_i,start_end)
-                self.regime_lhds[pm_i][r_i]=self.probability_models[pm_i].likelihood(start_end)
-        self.lhds=np.array([sum(self.regime_lhds[pm_i]) for pm_i in range(self.num_probability_models)],dtype=float)
-        self.likelihood=sum(self.lhds)
+                self.regime_lhds[r_i][pm_i]=self.probability_models[pm_i].likelihood(start_end)
+        self.likelihood=sum([sum(lr) for lr in self.regime_lhds])
         return(self.likelihood)
 
     def get_effective_changepoint_locations(self):
