@@ -206,7 +206,7 @@ class ChangepointModel(object):
     def mcmc(self,iterations=20,burnin=0,seed=None):
         if seed is not None:
             np.random.seed(seed)
-        for _ in range(-burnin,iterations):
+        for self.iteration in range(-burnin,iterations):
             self.mh_accept=True
             self.propose_move()
             self.accept_reject()
@@ -215,6 +215,7 @@ class ChangepointModel(object):
             self.num_cps_counter[self.num_cps]+=1
 
         self.write_changepoints_and_regimes()
+        self.calculate_posterior()
         self.print_acceptance_rates()
         self.calculate_posterior_means()
         sys.stdout.write("E[#Changepoints] = "+str(self.mean_num_cps)+"\n")
@@ -233,7 +234,7 @@ class ChangepointModel(object):
         self.proposal_functions[self.move_type]()
 
     def undo_move(self):
-        self.undo_proposal_functions[self.move_type]
+        self.undo_proposal_functions[self.move_type]()
 
     def accept_reject(self):
         if self.mh_accept and self.posterior==-float("inf"):
@@ -245,6 +246,8 @@ class ChangepointModel(object):
             self.mh_accept=False
         if self.mh_accept:
             self.proposal_acceptance_counts[self.move_type]+=1
+#        else:
+#            self.undo_move()
 
     def propose_delete_changepoint(self,index=None):
         self.proposed_index=index if index is not None else (1 if self.num_cps==1 else np.random.randint(1,self.num_cps))
@@ -273,7 +276,7 @@ class ChangepointModel(object):
         self.calculate_posterior()
 
     def calculate_posterior_means(self):
-        self.mean_num_cps=sum([k*self.num_cps_counter[k] for k in self.num_cps_counter])/sum(self.num_cps_counter)
+        self.mean_num_cps=sum([k*self.num_cps_counter[k] for k in self.num_cps_counter])/sum(self.num_cps_counter.values())
 
     def print_acceptance_rates(self,stream=sys.stdout):
         for m,c in self.proposal_move_counts.most_common():
