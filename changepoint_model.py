@@ -2,7 +2,7 @@ from probability_model import ProbabilityModel
 from data import Data
 import numpy as np
 import sys
-from collections import defaultdict
+from collections import defaultdict,Counter
 from poisson_gamma import PoissonGamma
 from regime_model import RegimeModel
 
@@ -45,12 +45,24 @@ class ChangepointModel(object):
         self.probability_models=probability_models
         self.num_probability_models=len(self.probability_models)
         self.T=max([pm.data.get_x_max() for pm in self.probability_models if pm.data is not None])
+        self.max_num_changepoints=float("inf")
         self.changepoint_prior=PoissonGamma(alpha_beta=[.1,.1])
         self.regimes_prior=RegimeModel()
         self.baseline_changepoint=Changepoint(-float("inf"),self.probability_models)
         self.set_changepoints([])
         self.regime_lhds=defaultdict(list)
         self.calculate_posterior()#calculate likelihoods for each prob. model
+        self.create_mh_dictionary()
+        self.proposal_move_counts=Counter()
+        self.proposal_acceptance_counts=Counter()
+
+    def create_mh_dictionary(self):
+        self.proposal_functions={}
+        self.proposal_functions["delete_changepoint"]=self.propose_delete_changepoint
+        self.proposal_functions["add_changepoint"]=self.propose_add_changepoint
+        self.undo_proposal_functions={}
+        self.undo_proposal_functions["delete_changepoint"]=self.undo_propose_delete_changepoint
+        self.undo_proposal_functions["add_changepoint"]=self.undo_propose_add_changepoint
 
     def get_changepoint_index_segment_start_end(self,pm_index,index):
         start=self.cps[index].data_locations[pm_index]
@@ -139,6 +151,7 @@ class ChangepointModel(object):
         if regime_number is None:
             regime_number=self.num_regimes
         self.add_changepoint_index_to_regime(index,regime_number)
+        return(index)
 
     def shift_changepoint(self,index,t):
         self.cps[index].tau=t
@@ -184,15 +197,26 @@ class ChangepointModel(object):
         if seed is not None:
             np.random.seed(seed)
         for _ in range(-burnin,iterations):
-            self.propose_delete_changepoint()
             self.mh_accept=True
+            self.propose_move()
             self.accept_reject()
             if not self.mh_accept:
-                self.undo_proposed_delete_changepoint()
+                self.undo_move()
+
+        self.print_acceptance_rates()
 
     def choose_move(self):
-        self.move_types=set("delete_changepoint","add_changepoint")
+        self.move_types=["delete_changepoint","add_changepoint"]
         self.move_type=np.random.choice(self.move_types)
+
+    def propose_move(self):
+        self.choose_move()
+        self.proposal_move_counts[self.move_type]+=1
+        print(self.move_type)
+        self.proposal_functions[self.move_type]()
+
+    def undo_move(self):
+        self.undo_proposal_functions[self.move_type]
 
     def accept_reject(self):
         if not self.mh_accept:
@@ -200,6 +224,8 @@ class ChangepointModel(object):
         self.accpeptance_ratio=self.posterior-self.stored_posterior
         if self.accpeptance_ratio<0 and np.random.exponential()<-self.accpeptance_ratio:
             self.mh_accept=False
+        if self.mh_accept:
+            self.proposal_acceptance_counts[self.move_type]+=1
 
     def propose_delete_changepoint(self,index=None):
         self.proposed_index=index if index is not None else (1 if self.num_cps==2 else np.random.randint(1,self.num_cps-1))
@@ -210,14 +236,25 @@ class ChangepointModel(object):
         self.delete_changepoint(self.proposed_index)
         self.calculate_posterior()
         self.write_changepoints_and_regimes()
-        print(self.likelihood)
 
-    def undo_proposed_delete_changepoint(self):
+    def undo_propose_delete_changepoint(self):
         regime=self.num_regimes if self.stored_num_regimes>self.num_regimes else self.stored_cp.regime_number
         self.add_changepoint(self.stored_cp.tau,regime)
         self.calculate_posterior()
 
-    def propose_add_changepoint(self,t=None):
-        if t is not None:
+    def propose_add_changepoint(self,t=None,regime=None):
+        self.stored_num_regimes=self.num_regimes
+        self.stored_posterior=self.posterior
+        if t is None:
             t=np.random.uniform(0,self.T)
-        self.proposed_index=self.find_position_in_changepoints(t)
+        self.proposed_index=self.add_changepoint(t,regime)
+        self.calculate_posterior()
+        self.write_changepoints_and_regimes()
+
+    def undo_propose_add_changepoint(self):
+        self.delete_changepoint(self.proposed_index)
+        self.calculate_posterior()
+
+    def print_acceptance_rates(self,stream=sys.stdout):
+        for m,c in self.proposal_move_counts.most_common():
+            stream.write(m+":\t"+str(self.proposal_acceptance_counts[m]/float(c)*100)+"%\n")
