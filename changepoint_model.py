@@ -66,7 +66,7 @@ class ChangepointModel(object):
 
     def get_changepoint_index_segment_start_end(self,pm_index,index):
         start=self.cps[index].data_locations[pm_index]
-        end=self.cps[index+1].data_locations[pm_index] if index<self.num_cps-1 else self.probability_models[pm_index].data.n
+        end=self.cps[index+1].data_locations[pm_index] if index<self.num_cps else self.probability_models[pm_index].data.n
         return((start,end))
 
     def get_lhd(self):
@@ -74,9 +74,9 @@ class ChangepointModel(object):
 
     def set_changepoints(self,tau,regimes=None):
         self.cps=np.sort(np.array([self.baseline_changepoint]+[Changepoint(t,self.probability_models) for t in tau],dtype=Changepoint))
-        self.num_cps=len(self.cps)
+        self.num_cps=len(self.cps)-1
         if regimes is None:
-            self.regimes=[Regime([_]) for _ in range(self.num_cps)]
+            self.regimes=[Regime([_]) for _ in range(self.num_cps+1)]
         else:
             self.regimes=[Regime(r) for r in regimes]
         self.num_regimes=len(self.regimes)
@@ -179,11 +179,11 @@ class ChangepointModel(object):
         return(self.likelihood)
 
     def get_effective_changepoint_locations(self):
-        return([self.cps[i+1].tau for i in range(self.num_cps-1) if self.cps[i+1].regime_number!=self.cps[i].regime_number])
+        return([self.cps[i+1].tau for i in range(self.num_cps) if self.cps[i+1].regime_number!=self.cps[i].regime_number])
 
     def calculate_prior(self):
-        self.prior=self.changepoint_prior.likelihood(y=self.num_cps-1)
-        self.regime_sequence=[self.cps[i].regime_number for i in range(self.num_cps)]
+        self.prior=self.changepoint_prior.likelihood(y=self.num_cps)
+        self.regime_sequence=[self.cps[i].regime_number for i in range(self.num_cps+1)]
         self.prior+=self.regimes_prior.likelihood(y=self.regime_sequence)
         return(self.prior)
 
@@ -206,8 +206,12 @@ class ChangepointModel(object):
         self.print_acceptance_rates()
 
     def choose_move(self):
-        self.move_types=["delete_changepoint","add_changepoint"]
-        self.move_type=np.random.choice(self.move_types)
+        self.available_move_types=[]
+        if self.num_cps>0:
+            self.available_move_types.append("delete_changepoint")
+        if self.num_cps<self.max_num_changepoints:
+            self.available_move_types.append("add_changepoint")
+        self.move_type=np.random.choice(self.available_move_types)
 
     def propose_move(self):
         self.choose_move()
@@ -228,7 +232,7 @@ class ChangepointModel(object):
             self.proposal_acceptance_counts[self.move_type]+=1
 
     def propose_delete_changepoint(self,index=None):
-        self.proposed_index=index if index is not None else (1 if self.num_cps==2 else np.random.randint(1,self.num_cps-1))
+        self.proposed_index=index if index is not None else (1 if self.num_cps==1 else np.random.randint(1,self.num_cps))
         self.stored_cp=self.cps[self.proposed_index]
         self.stored_num_regimes=self.num_regimes
 #        self.stored_lhds=self.regime_lhds
