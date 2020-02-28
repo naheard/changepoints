@@ -35,6 +35,6 @@ if not do_mcmc:
     print(cpm.get_effective_changepoint_locations())
     print(cpm.calculate_prior())
 else:
-    cpm.mcmc(10,seed=0)
+    cpm.mcmc(1000,seed=0)
 #print(cpm.find_position_in_changepoints(.3))
 #print(cpm.get_lhd())

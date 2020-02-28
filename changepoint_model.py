@@ -45,8 +45,10 @@ class ChangepointModel(object):
         self.probability_models=probability_models
         self.num_probability_models=len(self.probability_models)
         self.T=max([pm.data.get_x_max() for pm in self.probability_models if pm.data is not None])
+        self.N=max([pm.data.n for pm in self.probability_models if pm.data is not None])
         self.max_num_changepoints=float("inf")
-        self.changepoint_prior=PoissonGamma(alpha_beta=[.1,.1])
+        self.min_cp_spacing=float(self.T)/self.N
+        self.changepoint_prior=PoissonGamma(alpha_beta=[.01,10])
         self.regimes_prior=RegimeModel()
         self.baseline_changepoint=Changepoint(-float("inf"),self.probability_models)
         self.set_changepoints([])
@@ -55,6 +57,7 @@ class ChangepointModel(object):
         self.create_mh_dictionary()
         self.proposal_move_counts=Counter()
         self.proposal_acceptance_counts=Counter()
+        self.num_cps_counter=Counter()
 
     def create_mh_dictionary(self):
         self.proposal_functions={}
@@ -68,6 +71,10 @@ class ChangepointModel(object):
         start=self.cps[index].data_locations[pm_index]
         end=self.cps[index+1].data_locations[pm_index] if index<self.num_cps else self.probability_models[pm_index].data.n
         return((start,end))
+
+    def distance_to_rh_cp(self,index):
+        rh_cp_location=self.T if index==self.num_cps else self.cps[index+1].tau
+        return(rh_cp_location-self.cps[index].tau)
 
     def get_lhd(self):
         return(sum(self.lhds))
@@ -183,8 +190,11 @@ class ChangepointModel(object):
 
     def calculate_prior(self):
         self.prior=self.changepoint_prior.likelihood(y=self.num_cps)
+        if self.num_cps>0 and min([self.distance_to_rh_cp(i) for i in range(self.num_cps+1)])<self.min_cp_spacing:
+            self.prior=-float("inf")
         self.regime_sequence=[self.cps[i].regime_number for i in range(self.num_cps+1)]
-        self.prior+=self.regimes_prior.likelihood(y=self.regime_sequence)
+        regime_prior=self.regimes_prior.likelihood(y=self.regime_sequence)
+        self.prior+=regime_prior
         return(self.prior)
 
     def calculate_posterior(self):
@@ -202,8 +212,12 @@ class ChangepointModel(object):
             self.accept_reject()
             if not self.mh_accept:
                 self.undo_move()
+            self.num_cps_counter[self.num_cps]+=1
 
+        self.write_changepoints_and_regimes()
         self.print_acceptance_rates()
+        self.calculate_posterior_means()
+        sys.stdout.write("E[#Changepoints] = "+str(self.mean_num_cps)+"\n")
 
     def choose_move(self):
         self.available_move_types=[]
@@ -216,13 +230,14 @@ class ChangepointModel(object):
     def propose_move(self):
         self.choose_move()
         self.proposal_move_counts[self.move_type]+=1
-        print(self.move_type)
         self.proposal_functions[self.move_type]()
 
     def undo_move(self):
         self.undo_proposal_functions[self.move_type]
 
     def accept_reject(self):
+        if self.mh_accept and self.posterior==-float("inf"):
+            self.mh_accept=False
         if not self.mh_accept:
             return()
         self.accpeptance_ratio=self.posterior-self.stored_posterior
@@ -239,7 +254,6 @@ class ChangepointModel(object):
         self.stored_posterior=self.posterior
         self.delete_changepoint(self.proposed_index)
         self.calculate_posterior()
-        self.write_changepoints_and_regimes()
 
     def undo_propose_delete_changepoint(self):
         regime=self.num_regimes if self.stored_num_regimes>self.num_regimes else self.stored_cp.regime_number
@@ -253,11 +267,13 @@ class ChangepointModel(object):
             t=np.random.uniform(0,self.T)
         self.proposed_index=self.add_changepoint(t,regime)
         self.calculate_posterior()
-        self.write_changepoints_and_regimes()
 
     def undo_propose_add_changepoint(self):
         self.delete_changepoint(self.proposed_index)
         self.calculate_posterior()
+
+    def calculate_posterior_means(self):
+        self.mean_num_cps=sum([k*self.num_cps_counter[k] for k in self.num_cps_counter])/sum(self.num_cps_counter)
 
     def print_acceptance_rates(self,stream=sys.stdout):
         for m,c in self.proposal_move_counts.most_common():
