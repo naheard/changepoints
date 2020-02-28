@@ -50,7 +50,7 @@ class ChangepointModel(object):
         self.baseline_changepoint=Changepoint(-float("inf"),self.probability_models)
         self.set_changepoints([])
         self.regime_lhds=defaultdict(list)
-        self.calculate_likelihood()#likelihoods for each prob. model
+        self.calculate_posterior()#calculate likelihoods for each prob. model
 
     def get_changepoint_index_segment_start_end(self,pm_index,index):
         start=self.cps[index].data_locations[pm_index]
@@ -144,20 +144,6 @@ class ChangepointModel(object):
         self.cps[index].tau=t
         self.cps[index].find_data_positions()
 
-    def change_changepoint_regime(self,cp_index,regime_number):
-        if cp_index==0:#cannot change first segment from regime 0
-            exit()
-        if regime_number>self.num_regimes:#new regime
-            self.add_regime([cp_index])
-            self.regimes[self.cps[cp_index].regime_number].remove_cp_index(cp_index)
-        else:
-            if self.regimes[self.cps[cp_index].regime_number].length()==1:
-                self.delete_regime(self.cps[cp_index].regime_number)
-            else:
-                self.regimes[self.cps[cp_index].regime_number].remove_cp_index(cp_index)
-                self.insert_cp_index(cp_index)
-        self.cps[cp_index].regime_number=regime_number
-
     def change_regime_of_changepoint(self,index,new_regime_number):
         regime_number=self.cps[index].regime_number
         if self.regimes[regime_number].length()==1:
@@ -176,13 +162,62 @@ class ChangepointModel(object):
 #                print(r_i,start_end)
                 self.regime_lhds[pm_i][r_i]=self.probability_models[pm_i].likelihood(start_end)
         self.lhds=np.array([sum(self.regime_lhds[pm_i]) for pm_i in range(self.num_probability_models)],dtype=float)
-        return(sum(self.lhds))
+        self.likelihood=sum(self.lhds)
+        return(self.likelihood)
 
     def get_effective_changepoint_locations(self):
         return([self.cps[i+1].tau for i in range(self.num_cps-1) if self.cps[i+1].regime_number!=self.cps[i].regime_number])
 
     def calculate_prior(self):
-        prior=self.changepoint_prior.likelihood(y=self.num_cps-1)
+        self.prior=self.changepoint_prior.likelihood(y=self.num_cps-1)
         self.regime_sequence=[self.cps[i].regime_number for i in range(self.num_cps)]
-        prior+=self.regimes_prior.likelihood(y=self.regime_sequence)
-        return(prior)
+        self.prior+=self.regimes_prior.likelihood(y=self.regime_sequence)
+        return(self.prior)
+
+    def calculate_posterior(self):
+        self.calculate_likelihood()
+        self.calculate_prior()
+        self.posterior=self.likelihood+self.prior
+        return(self.posterior)
+
+    def mcmc(self,iterations=20,burnin=0,seed=None):
+        if seed is not None:
+            np.random.seed(seed)
+        for _ in range(-burnin,iterations):
+            self.propose_delete_changepoint()
+            self.mh_accept=True
+            self.accept_reject()
+            if not self.mh_accept:
+                self.undo_proposed_delete_changepoint()
+
+    def choose_move(self):
+        self.move_types=set("delete_changepoint","add_changepoint")
+        self.move_type=np.random.choice(self.move_types)
+
+    def accept_reject(self):
+        if not self.mh_accept:
+            return()
+        self.accpeptance_ratio=self.posterior-self.stored_posterior
+        if self.accpeptance_ratio<0 and np.random.exponential()<-self.accpeptance_ratio:
+            self.mh_accept=False
+
+    def propose_delete_changepoint(self,index=None):
+        self.proposed_index=index if index is not None else (1 if self.num_cps==2 else np.random.randint(1,self.num_cps-1))
+        self.stored_cp=self.cps[self.proposed_index]
+        self.stored_num_regimes=self.num_regimes
+#        self.stored_lhds=self.regime_lhds
+        self.stored_posterior=self.posterior
+        self.delete_changepoint(self.proposed_index)
+        self.calculate_posterior()
+        self.write_changepoints_and_regimes()
+        print(self.likelihood)
+
+    def undo_proposed_delete_changepoint(self):
+        regime=self.num_regimes if self.stored_num_regimes>self.num_regimes else self.stored_cp.regime_number
+        self.add_changepoint(self.stored_cp.tau,regime)
+        self.calculate_posterior()
+
+    def propose_add_changepoint(self,t=None):
+        if t is not None:
+            t=np.random.uniform(0,self.T)
+        self.proposed_index=self.find_position_in_changepoints(t)
