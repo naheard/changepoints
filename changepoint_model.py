@@ -215,7 +215,7 @@ class ChangepointModel(object):
             self.num_cps_counter[self.num_cps]+=1
 
         self.write_changepoints_and_regimes()
-        self.calculate_posterior()
+        print(self.posterior)
         self.print_acceptance_rates()
         self.calculate_posterior_means()
         sys.stdout.write("E[#Changepoints] = "+str(self.mean_num_cps)+"\n")
@@ -253,8 +253,8 @@ class ChangepointModel(object):
         self.proposed_index=index if index is not None else (1 if self.num_cps==1 else np.random.randint(1,self.num_cps))
         self.stored_cp=self.cps[self.proposed_index]
         self.stored_num_regimes=self.num_regimes
-#        self.stored_lhds=self.regime_lhds
         self.stored_posterior=self.posterior
+        self.affected_regimes=set([self.cps[self.proposed_index-1].regime_number,self.cps[self.proposed_index].regime_number])
         self.delete_changepoint(self.proposed_index)
         self.calculate_posterior()
 
@@ -269,6 +269,7 @@ class ChangepointModel(object):
         if t is None:
             t=np.random.uniform(0,self.T)
         self.proposed_index=self.add_changepoint(t,regime)
+        self.affected_regimes=set([self.cps[self.proposed_index-1].regime_number,self.cps[self.proposed_index].regime_number])
         self.calculate_posterior()
 
     def undo_propose_add_changepoint(self):
