@@ -99,6 +99,7 @@ class ChangepointModel(object):
         stream.write(delim.join([":".join(map(str,(cp.tau,cp.regime_number))) for cp in self.cps])+"\n")
 
     def delete_regime(self,regime_index):
+        self.deleted_regime_lhd=self.regime_lhds[regime_index]
         del self.regime_lhds[regime_index]
         for r_i in range(regime_index+1,self.num_regimes):
             for cp_i in self.regimes[r_i].cp_indices:
@@ -113,7 +114,7 @@ class ChangepointModel(object):
         for i in cp_indices:
             self.cps[i].regime_number=regime_index
 
-        self.regime_lhds.insert(regime_index,np.zeros(self.num_probability_models))
+        self.regime_lhds.insert(regime_index,np.zeros(self.num_probability_models) if self.deleted_regime_lhd is None else self.deleted_regime_lhd)
         for r_i in range(regime_index+1,self.num_regimes):
             for cp_i in self.regimes[r_i].cp_indices:
                 self.cps[cp_i].regime_number+=1
@@ -198,6 +199,7 @@ class ChangepointModel(object):
             np.random.seed(seed)
         for self.iteration in range(-burnin,iterations):
             self.mh_accept=True
+            self.deleted_regime_lhd=None
             self.propose_move()
             self.accept_reject()
             if not self.mh_accept:
