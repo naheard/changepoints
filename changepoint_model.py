@@ -58,6 +58,7 @@ class ChangepointModel(object):
         self.proposal_move_counts=Counter()
         self.proposal_acceptance_counts=Counter()
         self.num_cps_counter=Counter()
+        self.move_type=None
 
     def create_mh_dictionary(self):
         self.proposal_functions={}
@@ -173,8 +174,8 @@ class ChangepointModel(object):
             self.regimes[regime_number].remove_cp_index(index)
         self.add_changepoint_index_to_regime(index,new_regime_number)
 
-    def calculate_likelihood(self):
-        for r_i in range(self.num_regimes):# if self.affected_regimes is None else affected_regimes:
+    def calculate_likelihood(self,regimes=None):
+        for r_i in (range(self.num_regimes) if regimes is None else regimes):# if self.affected_regimes is None else affected_regimes:
             for pm_i in range(self.num_probability_models):
                 start_end=[self.get_changepoint_index_segment_start_end(pm_i,j) for j in self.regimes[r_i].cp_indices]
 #                print(r_i,start_end)
@@ -194,8 +195,8 @@ class ChangepointModel(object):
         self.prior+=regime_prior
         return(self.prior)
 
-    def calculate_posterior(self):
-        self.calculate_likelihood()
+    def calculate_posterior(self,regimes=None):
+        self.calculate_likelihood(regimes=regimes)
         self.calculate_prior()
         self.posterior=self.likelihood+self.prior
         return(self.posterior)
@@ -253,41 +254,53 @@ class ChangepointModel(object):
         self.stored_cp=self.cps[self.proposed_index]
         self.stored_num_regimes=self.num_regimes
         self.stored_posterior=self.posterior
+        self.stored_regime_lhds={}
         self.affected_regimes=[self.cps[self.proposed_index-1].regime_number,self.cps[self.proposed_index].regime_number]
+        self.stored_regime_lhds[self.affected_regimes[0]]=np.copy(self.regime_lhds[self.affected_regimes[0]])
         if self.regimes[self.affected_regimes[1]].length()==1:#regime will be deleted
+            self.stored_regime_lhds[self.affected_regimes[1]]=self.regime_lhds[self.affected_regimes[1]]
             if self.affected_regimes[1]<self.affected_regimes[0]:
                 self.revised_affected_regimes=[self.affected_regimes[0]-1]
             else:
                 self.revised_affected_regimes=[self.affected_regimes[0]]
         else:
             self.revised_affected_regimes=self.affected_regimes
-
+            self.stored_regime_lhds[self.affected_regimes[1]]=np.copy(self.regime_lhds[self.affected_regimes[1]])
         self.delete_changepoint(self.proposed_index)
-        self.calculate_posterior()
+        self.calculate_posterior(self.revised_affected_regimes)
 
     def undo_propose_delete_changepoint(self):
         regime=self.num_regimes if self.stored_num_regimes>self.num_regimes else self.stored_cp.regime_number
         self.add_changepoint(self.stored_cp.tau,regime)
-        self.calculate_posterior()
+        self.stored_num_regimes=self.num_regimes
+        for r in self.affected_regimes:
+            self.regime_lhds[r]=self.stored_regime_lhds[r]
+        self.calculate_posterior(regimes=[])
 
     def propose_add_changepoint(self,t=None,regime_number=None):
         self.stored_num_regimes=self.num_regimes
         self.stored_posterior=self.posterior
+        self.stored_regime_lhds={}
         if regime_number is None:
             regime_number=self.num_regimes
         if t is None:
             t=np.random.uniform(0,self.T)
         self.proposed_index=self.find_position_in_changepoints(t)
+        self.affected_regimes=[self.cps[self.proposed_index-1].regime_number]
         if regime_number==self.num_regimes:
             revised_regime_number=self.find_position_in_regimes([self.proposed_index])
-        self.affected_regimes=[self.cps[self.proposed_index-1].regime_number]
+        else:
+            self.affected_regimes+=[regime_number]
+        self.stored_regime_lhds[self.affected_regimes[0]]=np.copy(self.regime_lhds[self.affected_regimes[0]])
         self.revised_affected_regimes=[self.affected_regimes[0]+(1 if revised_regime_number<=self.affected_regimes[0] else 0),revised_regime_number]
         self.add_changepoint(t,regime_number)
-        self.calculate_posterior()
+        self.calculate_posterior(self.revised_affected_regimes)
 
     def undo_propose_add_changepoint(self):
         self.delete_changepoint(self.proposed_index)
-        self.calculate_posterior()
+        for r in self.affected_regimes:
+            self.regime_lhds[r]=self.stored_regime_lhds[r]
+        self.calculate_posterior(regimes=[])
 
     def calculate_posterior_means(self):
         self.mean_num_cps=sum([k*self.num_cps_counter[k] for k in self.num_cps_counter])/sum(self.num_cps_counter.values())
