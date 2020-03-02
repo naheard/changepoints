@@ -169,10 +169,7 @@ class ChangepointModel(object):
                 new_from_position=self.find_position_in_regimes(self.regimes[from_regime_number].cp_indices[1:])
                 if new_from_position > from_regime_number:
                     new_from_position-=1
-#                    print("III",from_regime_number,new_from_position)
-#                    self.write_regimes()
                     self.move_regime_position(from_regime_number,new_from_position)
-#                    self.write_regimes()
                     if to_regime_number is not None and from_regime_number < to_regime_number and to_regime_number < new_from_position:
                         to_regime_number-=1
                     if self.revised_affected_regimes is not None:
@@ -181,8 +178,6 @@ class ChangepointModel(object):
                                 self.revised_affected_regimes[r_i]-=1
             else:
                 new_from_position=from_regime_number
-#            print("+++",cp_index,from_regime_number,new_from_position)
-#            self.write_regimes()
             self.regimes[new_from_position].remove_cp_index(cp_index)
 
         if to_regime_number is not None: #cp is being added or moved to
@@ -279,15 +274,11 @@ class ChangepointModel(object):
         if seed is not None:
             np.random.seed(seed)
         for self.iteration in range(-burnin,iterations):
-#            print('-'*20,'Iteration',self.iteration)
-#            self.write_changepoints_and_regimes()
             self.mh_accept=True
             self.deleted_regime_lhd=None
             self.affected_regimes=None
             self.propose_move()
             self.accept_reject()
-#            print("-"*50,"Iteration ",self.iteration,self.move_type,self.mh_accept)
-#            self.write_changepoints_and_regimes()
             if not self.mh_accept:
                 self.undo_move()
             self.num_cps_counter[self.num_cps]+=1
@@ -345,8 +336,6 @@ class ChangepointModel(object):
             self.revised_affected_regimes=self.affected_regimes[:]
             self.stored_regime_lhds[self.affected_regimes[1]]=np.copy(self.regime_lhds[self.affected_regimes[1]])
         self.delete_changepoint(self.proposed_index)
-#        print("-"*63,"Iteration ",self.iteration,self.move_type,self.proposed_index)
-#        self.write_changepoints_and_regimes()
         self.calculate_posterior(self.revised_affected_regimes)
 
     def undo_propose_delete_changepoint(self):
@@ -382,8 +371,6 @@ class ChangepointModel(object):
             self.stored_regime_lhds[ar]=np.copy(self.regime_lhds[ar])
         self.revised_affected_regimes=[self.affected_regimes[0]+(1 if (regime_number== self.num_regimes and revised_regime_number<=self.affected_regimes[0]) else 0),revised_regime_number]
         self.add_changepoint(t,regime_number)
-#        print("AAAA  ",self.iteration,regime_number)
-#        self.write_changepoints_and_regimes()
         self.calculate_posterior(self.revised_affected_regimes)
 
     def undo_propose_add_changepoint(self):
