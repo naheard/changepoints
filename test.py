@@ -10,7 +10,7 @@ md=MultinomialDirichlet(dat,alpha=.01)
 pg=PoissonGamma(dat,alpha_beta=[.01,.01])
 tau=np.loadtxt('tau.txt')
 #print(md.changepoint_likelihood(tau=tau))
-cpm=ChangepointModel([md])#,pg])
+cpm=ChangepointModel([md],infer_regimes=True)#,pg])
 do_mcmc=True
 if not do_mcmc:
     cpm.write_changepoints_and_regimes()
