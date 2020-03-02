@@ -21,5 +21,5 @@ class RegimeModel(ProbabilityModel):
         for r in range(1,k+1):
             first_occurrences[r]=next(i for i in range(first_occurrences[r-1]+1,n) if y[i]==r)
         d_first_occurrences=np.diff(first_occurrences)
-        log_p_regimes=np.sum([-d_first_occurrences[i]*np.log((i+2)) for i in range(len(d_first_occurrences))])#assumes regime at each step is Uniform on available regimes
+        log_p_regimes=np.sum([-d_first_occurrences[i]*np.log((i+1)) for i in range(len(d_first_occurrences))])#assumes regime at each step is Uniform on available regimes
         return(log_p_regimes)
