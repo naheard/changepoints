@@ -439,24 +439,13 @@ class ChangepointModel(object):
         if new_regime_number<self.num_regimes:#not creating a new regime
             self.affected_regimes+=[new_regime_number]
         self.store_affected_regime_lhds()
-#        if self.iteration>=6828:
-#            print(self.iteration,self.move_type)
-#            self.write_changepoints_and_regimes()
-#            print(self.proposed_index,regime_number,new_regime_number)
         self.revised_affected_regimes=self.change_regime_of_changepoint(self.proposed_index,new_regime_number)
 #        print("affected:",self.revised_affected_regimes)
-#        if self.iteration>=6828:
-#            self.write_changepoints_and_regimes()
-#            print("affected:",self.affected_regimes)
-#            print("revised_affected:",self.revised_affected_regimes)
         self.calculate_posterior(self.revised_affected_regimes)
 
     def undo_propose_change_regime_of_changepoint(self):
-#        if self.iteration>=6828:
-#            print(self.proposed_index,self.num_regimes if len(self.revised_affected_regimes)==1 else self.revised_affected_regimes[0])
         copy_affected_regimes=self.affected_regimes[:]
         self.affected_regimes,self.revised_affected_regimes=self.revised_affected_regimes,self.affected_regimes
-##        self.change_regime_of_changepoint(self.proposed_index,self.num_regimes if len(self.revised_affected_regimes)==1 else self.revised_affected_regimes[0])
         self.change_regime_of_changepoint(self.proposed_index,self.num_regimes if len(self.affected_regimes)==1 else self.affected_regimes[0])
         for r in copy_affected_regimes:
             if r is not None:
