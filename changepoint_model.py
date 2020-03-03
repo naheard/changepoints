@@ -19,6 +19,11 @@ class Changepoint(object):
         t=t if t is not None else self.tau
         self.data_locations=np.array([pm.find_data_position(t) for pm in self.probability_models],dtype=int)
 
+    def set_location(self,t):
+        self.tau=t
+        if self.probability_models is not None:
+            self.find_data_positions()
+
     def __lt__(self,other):
         return(self.tau<other.tau)
 
@@ -70,10 +75,12 @@ class ChangepointModel(object):
 
     def create_mh_dictionary(self):
         self.proposal_functions={}
+        self.proposal_functions["shift_changepoint"]=self.propose_shift_changepoint
         self.proposal_functions["delete_changepoint"]=self.propose_delete_changepoint
         self.proposal_functions["add_changepoint"]=self.propose_add_changepoint
         self.proposal_functions["change_regime"]=self.propose_change_regime_of_changepoint
         self.undo_proposal_functions={}
+        self.undo_proposal_functions["shift_changepoint"]=self.undo_propose_shift_changepoint
         self.undo_proposal_functions["delete_changepoint"]=self.undo_propose_delete_changepoint
         self.undo_proposal_functions["add_changepoint"]=self.undo_propose_add_changepoint
         self.undo_proposal_functions["change_regime"]=self.undo_propose_change_regime_of_changepoint
@@ -238,8 +245,7 @@ class ChangepointModel(object):
         self.add_changepoint_index_to_regime(self.proposed_index,regime_number)
 
     def shift_changepoint(self,index,t):
-        self.cps[index].tau=t
-        self.cps[index].find_data_positions()
+        self.cps[index].set_location(t)
 
     def change_regime_of_changepoint(self,index,new_regime_number):
         regime_number=self.cps[index].regime_number
@@ -300,10 +306,12 @@ class ChangepointModel(object):
         self.mh_accept=True
         self.deleted_regime_lhd=None
         self.affected_regimes=self.revised_affected_regimes=None
+        self.stored_tau=None
 
     def choose_move(self):
         self.available_move_types=[]
         if self.num_cps>0:
+            self.available_move_types.append("shift_changepoint")
             self.available_move_types.append("delete_changepoint")
         if self.num_cps<self.max_num_changepoints:
             self.available_move_types.append("add_changepoint")
@@ -331,6 +339,23 @@ class ChangepointModel(object):
             self.proposal_acceptance_counts[self.move_type]+=1
 #        else:
 #            self.undo_move()
+
+    def propose_shift_changepoint(self,index=None):
+        self.proposed_index=index if index is not None else (1 if self.num_cps==1 else np.random.randint(1,self.num_cps))
+        self.stored_tau=self.cps[self.proposed_index].tau
+        left_boundary=self.cps[self.proposed_index-1].tau if self.proposed_index>1 else 0
+        right_boundary=self.cps[self.proposed_index+1].tau if self.proposed_index<self.num_cps else self.T
+        t=np.random.uniform(left_boundary,right_boundary)
+        self.revised_affected_regimes=self.affected_regimes=[self.cps[self.proposed_index-1].regime_number,self.cps[self.proposed_index].regime_number]
+        self.store_affected_regime_lhds()
+        self.shift_changepoint(self.proposed_index,t)
+        self.calculate_posterior(self.revised_affected_regimes)
+
+    def undo_propose_shift_changepoint(self):
+        self.shift_changepoint(self.proposed_index,self.stored_tau)
+        for r in self.affected_regimes:
+            self.regime_lhds[r]=self.stored_regime_lhds[r]
+        self.calculate_posterior(regimes=[])
 
     def propose_delete_changepoint(self,index=None):
         self.proposed_index=index if index is not None else (1 if self.num_cps==1 else np.random.randint(1,self.num_cps))
@@ -434,7 +459,6 @@ class ChangepointModel(object):
             print(self.iteration,self.move_type,self.mh_accept)
             self.write_changepoints_and_regimes()
             exit()
-
 
 def significantly_different(x,y,epsilon=1e-5):
     return(np.abs(x-y)>epsilon)
