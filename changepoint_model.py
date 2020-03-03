@@ -279,9 +279,9 @@ class ChangepointModel(object):
         return(self.prior)
 
     def calculate_posterior(self,regimes=None):
-        self.calculate_likelihood(regimes=regimes)
         self.calculate_prior()
-        self.posterior=self.likelihood+self.prior
+        self.calculate_likelihood(regimes=regimes)
+        self.posterior=self.prior+self.likelihood
         return(self.posterior)
 
     def mcmc(self,iterations=20,burnin=0,seed=None):
@@ -307,8 +307,14 @@ class ChangepointModel(object):
         self.deleted_regime_lhd=None
         self.affected_regimes=self.revised_affected_regimes=None
         self.stored_tau=None
+        self.proposal_ratio=0
 
     def choose_move(self):
+        self.get_available_move_types()
+        self.move_type=np.random.choice(self.available_move_types)
+        self.proposal_ratio=+np.log(len(self.available_move_types))
+
+    def get_available_move_types(self):
         self.available_move_types=[]
         if self.num_cps>0:
             self.available_move_types.append("shift_changepoint")
@@ -317,7 +323,6 @@ class ChangepointModel(object):
             self.available_move_types.append("add_changepoint")
         if self.infer_regimes and self.num_cps>1:
             self.available_move_types.append("change_regime")
-        self.move_type=np.random.choice(self.available_move_types)
 
     def propose_move(self):
         self.choose_move()
@@ -332,7 +337,9 @@ class ChangepointModel(object):
             self.mh_accept=False
         if not self.mh_accept:
             return()
-        self.accpeptance_ratio=self.posterior-self.stored_posterior
+        self.get_available_move_types()
+        self.proposal_ratio=-np.log(len(self.available_move_types))
+        self.accpeptance_ratio=self.proposal_ratio+self.posterior-self.stored_posterior
         if self.accpeptance_ratio<0 and np.random.exponential()<-self.accpeptance_ratio:
             self.mh_accept=False
         if self.mh_accept:
@@ -429,17 +436,31 @@ class ChangepointModel(object):
                     new_regime_number+=1
 
         self.affected_regimes=[regime_number]
-        if new_regime_number<self.num_regimes:
+        if new_regime_number<self.num_regimes:#not creating a new regime
             self.affected_regimes+=[new_regime_number]
         self.store_affected_regime_lhds()
+#        if self.iteration>=6828:
+#            print(self.iteration,self.move_type)
+#            self.write_changepoints_and_regimes()
+#            print(self.proposed_index,regime_number,new_regime_number)
         self.revised_affected_regimes=self.change_regime_of_changepoint(self.proposed_index,new_regime_number)
 #        print("affected:",self.revised_affected_regimes)
+#        if self.iteration>=6828:
+#            self.write_changepoints_and_regimes()
+#            print("affected:",self.affected_regimes)
+#            print("revised_affected:",self.revised_affected_regimes)
         self.calculate_posterior(self.revised_affected_regimes)
 
     def undo_propose_change_regime_of_changepoint(self):
-        self.change_regime_of_changepoint(self.proposed_index,self.num_regimes if len(self.revised_affected_regimes)==1 else self.revised_affected_regimes[0])
-        for r in self.affected_regimes:
-            self.regime_lhds[r]=self.stored_regime_lhds[r]
+#        if self.iteration>=6828:
+#            print(self.proposed_index,self.num_regimes if len(self.revised_affected_regimes)==1 else self.revised_affected_regimes[0])
+        copy_affected_regimes=self.affected_regimes[:]
+        self.affected_regimes,self.revised_affected_regimes=self.revised_affected_regimes,self.affected_regimes
+##        self.change_regime_of_changepoint(self.proposed_index,self.num_regimes if len(self.revised_affected_regimes)==1 else self.revised_affected_regimes[0])
+        self.change_regime_of_changepoint(self.proposed_index,self.num_regimes if len(self.affected_regimes)==1 else self.affected_regimes[0])
+        for r in copy_affected_regimes:
+            if r is not None:
+                self.regime_lhds[r]=self.stored_regime_lhds[r]
         self.calculate_posterior(regimes=[])
 
     def store_affected_regime_lhds(self):

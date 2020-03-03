@@ -12,7 +12,7 @@ class RegimeModel(ProbabilityModel):
         return(0)
 
     def log_density(self,y):
-        if y[0]!=0:
+        if y[0]!=0 or 0 in np.diff(y):
             return(-float("inf"))#first regime must be zero
         n=len(y)
         k=max(y)#number of non-zero regimes
