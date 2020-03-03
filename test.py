@@ -46,5 +46,7 @@ if not do_mcmc:
         print(cpm.calculate_posterior())
 else:
     cpm.mcmc(10000,seed=10)
+    print(cpm.get_effective_changepoint_locations())
+
 #print(cpm.find_position_in_changepoints(.3))
 #print(cpm.get_lhd())

@@ -307,7 +307,7 @@ class ChangepointModel(object):
             self.available_move_types.append("delete_changepoint")
         if self.num_cps<self.max_num_changepoints:
             self.available_move_types.append("add_changepoint")
-        if self.num_cps>1:
+        if self.infer_regimes and self.num_cps>1:
             self.available_move_types.append("change_regime")
         self.move_type=np.random.choice(self.available_move_types)
 
@@ -395,9 +395,9 @@ class ChangepointModel(object):
         self.proposed_index=index if index is not None else (2 if self.num_cps==2 else np.random.randint(2,self.num_cps))#first two cps have regimes 0 and 1 resp.
         regime_number=self.cps[self.proposed_index].regime_number
         if new_regime_number is None:
-            blocked_regimes=[regime_number,self.cps[self.proposed_index-1].regime_number]
-            if self.proposed_index<self.num_cps:
-                blocked_regimes+=[self.cps[self.proposed_index+1].regime_number]
+            blocked_regimes=[regime_number]#,self.cps[self.proposed_index-1].regime_number]
+#            if self.proposed_index<self.num_cps:
+#                blocked_regimes+=[self.cps[self.proposed_index+1].regime_number]
             new_regime_number=np.random.randint(self.num_regimes-len(blocked_regimes)+1)
             for br in np.sort(np.unique(blocked_regimes)):
                 if new_regime_number>=br:
