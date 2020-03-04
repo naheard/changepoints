@@ -386,7 +386,7 @@ class ChangepointModel(object):
         else:
             self.revised_affected_regimes=self.affected_regimes[:]
             self.stored_regime_lhds[self.affected_regimes[1]]=np.copy(self.regime_lhds[self.affected_regimes[1]])
-        self.proposal_ratio-=self.LOG_T
+#        self.proposal_ratio-=self.LOG_T
         if self.infer_regimes:
             dummy_regime_number,regime_log_proposal=self.regimes_model.propose_regime(self.num_regimes-(1 if regime_will_vanish else 0),self.cps[self.proposed_index-1].regime_number,None if self.proposed_index==self.num_cps else self.cps[self.proposed_index+1].regime_number)
             self.proposal_ratio+=regime_log_proposal
@@ -406,7 +406,7 @@ class ChangepointModel(object):
         self.stored_posterior=self.posterior
         if t is None:
             t=np.random.uniform(0,self.T)
-            self.proposal_ratio+=self.LOG_T
+#            self.proposal_ratio+=self.LOG_T
         self.proposed_index=self.find_position_in_changepoints(t)
         if regime_number is None:
             if not self.infer_regimes:
