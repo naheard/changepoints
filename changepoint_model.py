@@ -51,16 +51,18 @@ class Regime(object):
         stream.write(delim.join(map(str,self.cp_indices))+"\n")
 
 class ChangepointModel(object):
-    def __init__(self,probability_models=np.array([],dtype=ProbabilityModel),infer_regimes=False):
+    def __init__(self,probability_models=np.array([],dtype=ProbabilityModel),infer_regimes=False,disallow_successive_regimes=True,spike_regimes=False):
         self.probability_models=probability_models
         self.num_probability_models=len(self.probability_models)
         self.T=max([pm.data.get_x_max() for pm in self.probability_models if pm.data is not None])
+        self.LOG_T=np.log(self.T)
         self.N=max([pm.data.n for pm in self.probability_models if pm.data is not None])
         self.max_num_changepoints=float("inf")
         self.min_cp_spacing=float(self.T)/self.N
         self.infer_regimes=infer_regimes
         self.changepoint_prior=PoissonGamma(alpha_beta=[.01,10])
-        self.regimes_prior=RegimeModel()
+        if self.infer_regimes:
+            self.regimes_model=RegimeModel(disallow_successive_regimes=disallow_successive_regimes,spike_regimes=spike_regimes)
         self.baseline_changepoint=Changepoint(-float("inf"),self.probability_models)
         self.set_changepoints([])
         self.regime_lhds=[np.zeros(self.num_probability_models) for _ in range(self.num_regimes)]
@@ -274,7 +276,7 @@ class ChangepointModel(object):
         if self.num_cps>0 and min([self.distance_to_rh_cp(i) for i in range(self.num_cps+1)])<self.min_cp_spacing:
             self.prior=-float("inf")
         self.regime_sequence=[self.cps[i].regime_number for i in range(self.num_cps+1)]
-        regime_prior=self.regimes_prior.likelihood(y=self.regime_sequence)
+        regime_prior=self.regimes_model.likelihood(y=self.regime_sequence)
         self.prior+=regime_prior
         return(self.prior)
 
@@ -312,7 +314,7 @@ class ChangepointModel(object):
     def choose_move(self):
         self.get_available_move_types()
         self.move_type=np.random.choice(self.available_move_types)
-        self.proposal_ratio=+np.log(len(self.available_move_types))
+        self.proposal_ratio=np.log(len(self.available_move_types))
 
     def get_available_move_types(self):
         self.available_move_types=[]
@@ -338,7 +340,7 @@ class ChangepointModel(object):
         if not self.mh_accept:
             return()
         self.get_available_move_types()
-        self.proposal_ratio=-np.log(len(self.available_move_types))
+        self.proposal_ratio-=np.log(len(self.available_move_types))
         self.accpeptance_ratio=self.proposal_ratio+self.posterior-self.stored_posterior
         if self.accpeptance_ratio<0 and np.random.exponential()<-self.accpeptance_ratio:
             self.mh_accept=False
@@ -365,14 +367,16 @@ class ChangepointModel(object):
         self.calculate_posterior(regimes=[])
 
     def propose_delete_changepoint(self,index=None):
-        self.proposed_index=index if index is not None else (1 if self.num_cps==1 else np.random.randint(1,self.num_cps))
+        self.proposed_index=index if index is not None else (1 if self.num_cps==1 else 1+np.random.randint(self.num_cps))
         self.stored_cp=self.cps[self.proposed_index]
         self.stored_num_regimes=self.num_regimes
         self.stored_posterior=self.posterior
         self.stored_regime_lhds={}
+        regime_will_vanish=False
         self.affected_regimes=[self.cps[self.proposed_index-1].regime_number,self.cps[self.proposed_index].regime_number]
         self.stored_regime_lhds[self.affected_regimes[0]]=np.copy(self.regime_lhds[self.affected_regimes[0]])
         if self.regimes[self.affected_regimes[1]].length()==1:#regime will be deleted
+            regime_will_vanish=True
             self.stored_regime_lhds[self.affected_regimes[1]]=self.regime_lhds[self.affected_regimes[1]]
             if self.affected_regimes[1]<self.affected_regimes[0]:
                 self.revised_affected_regimes=[self.affected_regimes[0]-1]
@@ -381,6 +385,10 @@ class ChangepointModel(object):
         else:
             self.revised_affected_regimes=self.affected_regimes[:]
             self.stored_regime_lhds[self.affected_regimes[1]]=np.copy(self.regime_lhds[self.affected_regimes[1]])
+        self.proposal_ratio-=self.LOG_T
+        if self.infer_regimes:
+            dummy_regime_number,regime_log_proposal=self.regimes_model.propose_regime(self.num_regimes-(1 if regime_will_vanish else 0),self.cps[self.proposed_index-1].regime_number,None if self.proposed_index==self.num_cps else self.cps[self.proposed_index+1].regime_number)
+            self.proposal_ratio+=regime_log_proposal
         self.delete_changepoint(self.proposed_index)
         self.calculate_posterior(self.revised_affected_regimes)
 
@@ -397,12 +405,15 @@ class ChangepointModel(object):
         self.stored_posterior=self.posterior
         if t is None:
             t=np.random.uniform(0,self.T)
+            self.proposal_ratio+=self.LOG_T
         self.proposed_index=self.find_position_in_changepoints(t)
         if regime_number is None:
             if not self.infer_regimes:
                 regime_number=self.num_regimes
             else:
 #                regime_number=np.random.randint(self.num_regimes+1)
+                regime_number,regime_log_proposal=self.regimes_model.propose_regime(self.num_regimes,self.cps[self.proposed_index-1].regime_number,None if self.proposed_index==self.num_cps+1 else self.cps[self.proposed_index].regime_number)
+                self.proposal_ratio-=regime_log_proposal
                 regime_number=np.random.randint(self.num_regimes)
                 if regime_number==self.cps[self.proposed_index-1].regime_number:
                     regime_number=self.num_regimes
@@ -427,13 +438,7 @@ class ChangepointModel(object):
         self.proposed_index=index if index is not None else (2 if self.num_cps==2 else np.random.randint(2,self.num_cps))#first two cps have regimes 0 and 1 resp.
         regime_number=self.cps[self.proposed_index].regime_number
         if new_regime_number is None:
-            blocked_regimes=[regime_number]#,self.cps[self.proposed_index-1].regime_number]
-#            if self.proposed_index<self.num_cps:
-#                blocked_regimes+=[self.cps[self.proposed_index+1].regime_number]
-            new_regime_number=np.random.randint(self.num_regimes-len(blocked_regimes)+1)
-            for br in np.sort(np.unique(blocked_regimes)):
-                if new_regime_number>=br:
-                    new_regime_number+=1
+            new_regime_number,regime_log_proposal=self.regimes_model.propose_regime(self.num_regimes,self.cps[self.proposed_index-1].regime_number,None if self.proposed_index==self.num_cps else self.cps[self.proposed_index+1].regime_number,regime_number)
 
         self.affected_regimes=[regime_number]
         if new_regime_number<self.num_regimes:#not creating a new regime
