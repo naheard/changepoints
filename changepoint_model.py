@@ -275,9 +275,10 @@ class ChangepointModel(object):
         self.prior=self.changepoint_prior.likelihood(y=self.num_cps)
         if self.num_cps>0 and min([self.distance_to_rh_cp(i) for i in range(self.num_cps+1)])<self.min_cp_spacing:
             self.prior=-float("inf")
-        self.regime_sequence=[self.cps[i].regime_number for i in range(self.num_cps+1)]
-        regime_prior=self.regimes_model.likelihood(y=self.regime_sequence)
-        self.prior+=regime_prior
+        if self.infer_regimes:
+            self.regime_sequence=[self.cps[i].regime_number for i in range(self.num_cps+1)]
+            regime_prior=self.regimes_model.likelihood(y=self.regime_sequence)
+            self.prior+=regime_prior
         return(self.prior)
 
     def calculate_posterior(self,regimes=None):
