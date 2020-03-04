@@ -20,11 +20,15 @@ class RegimeModel(ProbabilityModel):
             return(-float("inf"))#first regime must be zero
         n=len(y)
         if self.spike_regimes:
-            if len(y)>1:
-                non_zero_y=[y_i for y_i in y if y_i!=0]
-                if len(non_zero_y) != len(set(non_zero_y)):
-                    return(-float("inf"))#non zero-regimes must occur only once in this model
-            return(-(n-1)*LOG_TWO)
+            if len(y)==1:
+                return(0)
+            non_zero_y=[y_i for y_i in y if y_i!=0]
+            n_non_zero=len(non_zero_y)
+            if n_non_zero != len(set(non_zero_y)):
+                return(-float("inf"))#non zero-regimes must occur only once in this model
+            if y[-1]!=0:
+                n_non_zero-=1
+            return(-(n_non_zero if self.disallow_successive_regimes else n-1) *LOG_TWO)
 
         k=max(y)#number of non-zero regimes
 #        log_p_k=-np.log(n-1) #assumes k~U({0,1,..,n-1})
