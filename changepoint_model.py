@@ -5,6 +5,7 @@ import sys
 from collections import defaultdict,Counter
 from poisson_gamma import PoissonGamma
 from regime_model import RegimeModel
+from bernoulli_beta import BernoulliBeta
 
 class Changepoint(object):
     probability_models=None
@@ -47,7 +48,22 @@ class Regime(object):
         self.cp_indices.remove(cp_i)
 
     def length(self):
-        return len(self.cp_indices)
+        return(len(self.cp_indices))
+
+    def model_is_active(self,pm_i):
+        return(self.inclusion_vector[pm_i] if self.inclusion_vector is not None else True)
+
+    def is_active(self):
+        return(any(self.inclusion_vector) if self.inclusion_vector is not None else True)
+
+    def inclusion_vector_flip_position(self,pm_i):
+        self.inclusion_vector[pm_i]=not self.inclusion_vector[pm_i]
+
+    def get_inclusion_counts(self):
+        if self.inclusion_vector is None:
+            return(None)
+        n_active=np.count_nonzero(self.inclusion_vector)
+        return([Changepoint.num_probability_models-n_active,n_active])
 
     def write(self,stream=sys.stdout,delim=" "):
         stream.write(delim.join(map(str,self.cp_indices))+"\n")
@@ -65,21 +81,22 @@ class ChangepointModel(object):
         self.min_cp_spacing=float(self.T)/self.N
         self.infer_regimes=infer_regimes
         self.changepoint_prior=PoissonGamma(alpha_beta=[.01,10])
+        self.inclusion_prior=BernoulliBeta(alpha_beta=[.01,10])
         if self.infer_regimes:
             self.regimes_model=RegimeModel(disallow_successive_regimes=disallow_successive_regimes,spike_regimes=spike_regimes)
         self.baseline_changepoint=Changepoint(-float("inf"),0)
-        self.zeroth_regime=Regime([0])
+        self.zeroth_regime=Regime([0],np.ones(Changepoint.num_probability_models,dtype="bool"))
         self.regimes=[self.zeroth_regime]
         self.set_changepoints([])
         self.regime_lhds=[np.zeros(self.num_probability_models) for _ in range(self.num_regimes)]
         self.affected_regimes=self.revised_affected_regimes=None
         self.deleted_regime_lhd=None
+        self.move_type=None
         self.calculate_posterior()#calculate likelihoods for each prob. model
         self.create_mh_dictionary()
         self.proposal_move_counts=Counter()
         self.proposal_acceptance_counts=Counter()
         self.num_cps_counter=Counter()
-        self.move_type=None
 
     def create_mh_dictionary(self):
         self.proposal_functions={}
@@ -97,10 +114,20 @@ class ChangepointModel(object):
 
     def get_changepoint_index_segment_start_end(self,pm_index,cp_index):
         start=self.cps[cp_index].data_locations[pm_index]
-        next_cp_index=next((i for i in range(cp_index+1,self.num_cps+1) if self.regimes[self.cps[i].regime_number].inclusion_vector[pm_index]),self.num_cps+1)
+        next_cp_index=self.get_active_cp_to_right(cp_index,pm_index)#next((i for i in range(cp_index+1,self.num_cps+1) if self.regimes[self.cps[i].regime_number].model_is_active(pm_index)),self.num_cps+1)
         end=self.cps[next_cp_index].data_locations[pm_index] if next_cp_index<=self.num_cps else self.probability_models[pm_index].data.n
 #        end=self.cps[cp_index+1].data_locations[pm_index] if cp_index<self.num_cps else self.probability_models[pm_index].data.n
         return((start,end))
+
+    def get_active_cp_to_right(self,cp_index,pm_index=None):
+        if pm_index is None:
+            return(cp_index+1)
+        return(next((i for i in range(cp_index+1,self.num_cps+1) if self.regimes[self.cps[i].regime_number].model_is_active(pm_index)),self.num_cps+1))
+
+    def get_active_cp_to_left(self,cp_index,pm_index=None):
+        if pm_index is None:
+            return(cp_index-1)
+        return(next((i for i in range(cp_index-1,-1,-1) if self.regimes[self.cps[i].regime_number].model_is_active(pm_index))))
 
     def distance_to_rh_cp(self,index):
         rh_cp_location=self.T if index==self.num_cps else self.cps[index+1].tau
@@ -131,6 +158,12 @@ class ChangepointModel(object):
     def write_changepoints_and_regimes(self,stream=sys.stderr,delim="\t"):
         stream.write(delim.join([":".join(map(str,(cp.tau,cp.regime_number))) for cp in self.cps])+"\n")
 
+    def write_regime_inclusion_vectors(self,stream=sys.stderr,delim="\t"):
+        try:
+            stream.write(delim.join([str(r_i)+":"+",".join(map(str,self.regimes[r_i].inclusion_vector)) for r_i in range(self.num_regimes)])+"\n")
+        except:
+            None
+
     def write_regimes(self,stream=sys.stdout,delim=" "):
         for r_i in self.regimes:
             r_i.write(stream,delim)
@@ -153,7 +186,10 @@ class ChangepointModel(object):
     def add_regime(self,cp_indices,regime_index=None):
         if regime_index is None:
             regime_index=self.find_position_in_regimes(cp_indices)
-        self.regimes.insert(regime_index,Regime(cp_indices))
+        inclusion_vector=None
+        if self.inclusion_prior is not None:
+            inclusion_vector=self.sample_inclusion_vector()
+        self.regimes.insert(regime_index,Regime(cp_indices,inclusion_vector))
         self.num_regimes+=1
         for i in cp_indices:
             self.cps[i].regime_number=regime_index
@@ -244,9 +280,11 @@ class ChangepointModel(object):
                 if r.cp_indices[i]>index:
                     r.cp_indices[i]-=1
 
-    def add_changepoint(self,t,regime_number=None,index=None):
+    def add_changepoint(self,t=None,regime_number=None,cp=None,index=None):
         self.proposed_index=index if index is not None else self.find_position_in_changepoints(t)
-        self.cps=np.insert(self.cps,self.proposed_index,Changepoint(t,regime_number))
+        if cp is None:
+            cp=Changepoint(t,regime_number)
+        self.cps=np.insert(self.cps,self.proposed_index,cp)
         self.num_cps+=1
         for r in self.regimes:
             for i in range(r.length()):
@@ -270,11 +308,14 @@ class ChangepointModel(object):
             return(self.update_and_reposition_regimes(index,regime_number,new_regime_number))
 
     def calculate_likelihood(self,regimes=None):
+        if self.inclusion_prior is not None:
+            regimes=None
         for r_i in (range(self.num_regimes) if regimes is None else np.unique(regimes)):# if self.affected_regimes is None else affected_regimes:
             for pm_i in range(self.num_probability_models):
-                start_end=[self.get_changepoint_index_segment_start_end(pm_i,j) for j in self.regimes[r_i].cp_indices]
-#                print(r_i,start_end)
-                self.regime_lhds[r_i][pm_i]=self.probability_models[pm_i].likelihood(start_end)
+                if self.regimes[r_i].model_is_active(pm_i):
+                    start_end=[self.get_changepoint_index_segment_start_end(pm_i,j) for j in self.regimes[r_i].cp_indices]
+#                    print(pm_i,r_i,start_end)
+                    self.regime_lhds[r_i][pm_i]=self.probability_models[pm_i].likelihood(start_end)
         self.likelihood=sum([sum(lr) for lr in self.regime_lhds])
         return(self.likelihood)
 
@@ -282,7 +323,7 @@ class ChangepointModel(object):
         regime_number=0
         effective_cps=[]
         for i in range(1,self.num_cps+1):
-            if self.cps[i].regime_number!=regime_number and any(self.regimes[self.cps[i].regime_number].inclusion_vector):
+            if self.cps[i].regime_number!=regime_number and self.regimes[self.cps[i].regime_number].is_active():
                 regime_number=self.cps[i].regime_number
                 effective_cps+=[self.cps[i].tau]
 
@@ -296,6 +337,11 @@ class ChangepointModel(object):
             self.regime_sequence=[self.cps[i].regime_number for i in range(self.num_cps+1)]
             regime_prior=self.regimes_model.likelihood(y=self.regime_sequence)
             self.prior+=regime_prior
+            if self.inclusion_prior is not None:
+                for r in self.regimes:
+                    inclusion_counts=r.get_inclusion_counts()
+                    if inclusion_counts is not None:
+                        self.prior+=self.inclusion_prior.likelihood(y=inclusion_counts)
         return(self.prior)
 
     def calculate_posterior(self,regimes=None):
@@ -317,6 +363,7 @@ class ChangepointModel(object):
 #            self.check_posterior()
 
         self.write_changepoints_and_regimes()
+        self.write_regime_inclusion_vectors()
         sys.stderr.write("Final posterior="+str(self.posterior)+"\n")
         self.print_acceptance_rates()
         self.calculate_posterior_means()
@@ -343,7 +390,7 @@ class ChangepointModel(object):
             self.available_move_types.append("add_changepoint")
         if self.infer_regimes and self.num_cps>1:
             self.available_move_types.append("change_regime")
-        if self.infer_regimes and self.num_regimes>1:
+        if self.infer_regimes and self.inclusion_prior is not None and self.num_regimes>1:
             self.available_move_types.append("change_regime_inclusion")
 
     def propose_move(self):
@@ -414,7 +461,7 @@ class ChangepointModel(object):
 
     def undo_propose_delete_changepoint(self):
         regime=self.num_regimes if self.stored_num_regimes>self.num_regimes else self.stored_cp.regime_number
-        self.add_changepoint(self.stored_cp.tau,regime)
+        self.add_changepoint(cp=self.stored_cp,index=self.proposed_index)#self.stored_cp.tau,regime)
         self.stored_num_regimes=self.num_regimes
         for r in self.affected_regimes:
             self.regime_lhds[r]=self.stored_regime_lhds[r]
@@ -434,8 +481,6 @@ class ChangepointModel(object):
 #                regime_number=np.random.randint(self.num_regimes+1)
                 regime_number,regime_log_proposal=self.regimes_model.propose_regime(self.num_regimes,self.cps[self.proposed_index-1].regime_number,None if self.proposed_index==self.num_cps+1 else self.cps[self.proposed_index].regime_number)
                 self.proposal_ratio-=regime_log_proposal
-                if regime_number==self.cps[self.proposed_index-1].regime_number:
-                    regime_number=self.num_regimes
         self.affected_regimes=[self.cps[self.proposed_index-1].regime_number]
         if regime_number==self.num_regimes:
             revised_regime_number=self.find_position_in_regimes([self.proposed_index])
@@ -464,7 +509,6 @@ class ChangepointModel(object):
             self.affected_regimes+=[new_regime_number]
         self.store_affected_regime_lhds()
         self.revised_affected_regimes=self.change_regime_of_changepoint(self.proposed_index,new_regime_number)
-#        print("affected:",self.revised_affected_regimes)
         self.calculate_posterior(self.revised_affected_regimes)
 
     def undo_propose_change_regime_of_changepoint(self):
@@ -478,13 +522,16 @@ class ChangepointModel(object):
     def propose_change_regime_inclusion_vector(self,regime_number=None,pm_index=None):
         self.proposed_regime_number=np.random.randint(1,self.num_regimes) if regime_number is None else regime_number
         self.proposed_pm_index=np.random.randint(self.num_probability_models) if pm_index is None else pm_index
-        self.regimes[self.proposed_regime_number].inclusion_vector[self.proposed_pm_index]=not self.regimes[self.proposed_regime_number].inclusion_vector[self.proposed_pm_index]
+        self.regimes[self.proposed_regime_number].inclusion_vector_flip_position(self.proposed_pm_index)
         self.revised_affected_regimes=self.affected_regimes=range(self.num_regimes)
         self.store_affected_regime_lhds()
         self.calculate_posterior()
 
+    def sample_inclusion_vector(self):
+        return(np.array(self.inclusion_prior.simulate_data(self.num_probability_models),dtype="bool")[0])
+
     def undo_propose_change_regime_inclusion_vector(self):
-        self.regimes[self.proposed_regime_number].inclusion_vector[self.proposed_pm_index]=not self.regimes[self.proposed_regime_number].inclusion_vector[self.proposed_pm_index]
+        self.regimes[self.proposed_regime_number].inclusion_vector_flip_position(self.proposed_pm_index)
         self.recover_affected_regime_lhds()
         self.calculate_posterior(regimes=[])
 
@@ -502,12 +549,14 @@ class ChangepointModel(object):
 
     def print_acceptance_rates(self,stream=sys.stderr):
         for m,c in self.proposal_move_counts.most_common():
-            stream.write(m+":\t"+str(self.proposal_acceptance_counts[m]/float(c)*100)+"%\n")
+            a=self.proposal_acceptance_counts[m]
+            stream.write(m+":\t"+str(a)+"/"+str(c)+"\t"+str(a/float(c)*100)+"%\n")
 
     def check_posterior(self):
         if significantly_different(self.posterior,self.calculate_posterior()):
             print(self.iteration,self.move_type,self.mh_accept)
             self.write_changepoints_and_regimes()
+            self.print_acceptance_rates()
             exit()
 
 def significantly_different(x,y,epsilon=1e-5):
