@@ -7,20 +7,21 @@ from poisson_gamma import PoissonGamma
 from regime_model import RegimeModel
 
 class Changepoint(object):
-    def __init__(self,t,probability_models=None,regime_number=None):
+    probability_models=None
+
+    def __init__(self,t,regime_number=None):
         self.tau=t
-        self.probability_models=probability_models
-        if probability_models is not None:
+        if Changepoint.probability_models is not None:
             self.find_data_positions()
         self.regime_number=regime_number
 
     def find_data_positions(self,t=None):
         t=t if t is not None else self.tau
-        self.data_locations=np.array([pm.find_data_position(t) for pm in self.probability_models],dtype=int)
+        self.data_locations=np.array([pm.find_data_position(t) for pm in Changepoint.probability_models],dtype=int)
 
     def set_location(self,t):
         self.tau=t
-        if self.probability_models is not None:
+        if Changepoint.probability_models is not None:
             self.find_data_positions()
 
     def __lt__(self,other):
@@ -53,6 +54,7 @@ class Regime(object):
 class ChangepointModel(object):
     def __init__(self,probability_models=np.array([],dtype=ProbabilityModel),infer_regimes=False,disallow_successive_regimes=True,spike_regimes=False):
         self.probability_models=probability_models
+        Changepoint.probability_models=self.probability_models
         self.num_probability_models=len(self.probability_models)
         self.T=max([pm.data.get_x_max() for pm in self.probability_models if pm.data is not None])
         self.LOG_T=np.log(self.T)
@@ -63,7 +65,7 @@ class ChangepointModel(object):
         self.changepoint_prior=PoissonGamma(alpha_beta=[.01,10])
         if self.infer_regimes:
             self.regimes_model=RegimeModel(disallow_successive_regimes=disallow_successive_regimes,spike_regimes=spike_regimes)
-        self.baseline_changepoint=Changepoint(-float("inf"),self.probability_models,0)
+        self.baseline_changepoint=Changepoint(-float("inf"),0)
         self.zeroth_regime=Regime([0],inclusion_vector=np.ones(self.num_probability_models,dtype="bool"))
         self.regimes=[self.zeroth_regime]
         self.set_changepoints([])
@@ -99,7 +101,7 @@ class ChangepointModel(object):
         return(rh_cp_location-self.cps[index].tau)
 
     def set_changepoints(self,tau,regimes=None):
-        self.cps=np.sort(np.array([self.baseline_changepoint]+[Changepoint(t,self.probability_models) for t in tau],dtype=Changepoint))
+        self.cps=np.sort(np.array([self.baseline_changepoint]+[Changepoint(t) for t in tau],dtype=Changepoint))
         self.num_cps=len(self.cps)-1
         if regimes is None:
             self.regimes=[self.zeroth_regime]+[Regime([_+1]) for _ in range(self.num_cps)]
@@ -238,7 +240,7 @@ class ChangepointModel(object):
 
     def add_changepoint(self,t,regime_number=None,index=None):
         self.proposed_index=index if index is not None else self.find_position_in_changepoints(t)
-        self.cps=np.insert(self.cps,self.proposed_index,Changepoint(t,self.probability_models,regime_number))
+        self.cps=np.insert(self.cps,self.proposed_index,Changepoint(t,regime_number))
         self.num_cps+=1
         for r in self.regimes:
             for i in range(r.length()):
@@ -360,7 +362,7 @@ class ChangepointModel(object):
         self.revised_affected_regimes=self.affected_regimes=[self.cps[self.proposed_index-1].regime_number,self.cps[self.proposed_index].regime_number]
         self.store_affected_regime_lhds()
         t=np.random.uniform(left_boundary,right_boundary)
-        self.cps[self.proposed_index]=Changepoint(t,self.probability_models,regime_number=self.cps[self.proposed_index].regime_number)
+        self.cps[self.proposed_index]=Changepoint(t,regime_number=self.cps[self.proposed_index].regime_number)
         self.calculate_posterior(self.revised_affected_regimes)
 
     def undo_propose_shift_changepoint(self):
