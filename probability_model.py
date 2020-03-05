@@ -26,6 +26,10 @@ class ProbabilityModel(ABC):
     def sample_parameter(self):
         pass
 
+    @abstractmethod
+    def simulate_data(self,n):
+        pass
+
     def find_data_position(self,t):
         if self.data is None:
             position=0
