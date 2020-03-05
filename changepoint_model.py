@@ -8,6 +8,7 @@ from regime_model import RegimeModel
 
 class Changepoint(object):
     probability_models=None
+    num_probability_models=0
 
     def __init__(self,t,regime_number=None):
         self.tau=t
@@ -30,7 +31,7 @@ class Changepoint(object):
 class Regime(object):
     def __init__(self,cp_indices,inclusion_vector=None):
         self.cp_indices=cp_indices
-        self.inclusion_vector=inclusion_vector
+        self.inclusion_vector=inclusion_vector if inclusion_vector is not None else np.ones(Changepoint.num_probability_models,dtype="bool")
 
     def __lt__(self,other):#find which regime occurs first
         return(self.cp_indices[0]<other.cp_indices[0])
@@ -54,8 +55,9 @@ class Regime(object):
 class ChangepointModel(object):
     def __init__(self,probability_models=np.array([],dtype=ProbabilityModel),infer_regimes=False,disallow_successive_regimes=True,spike_regimes=False):
         self.probability_models=probability_models
-        Changepoint.probability_models=self.probability_models
         self.num_probability_models=len(self.probability_models)
+        Changepoint.probability_models=self.probability_models
+        Changepoint.num_probability_models=self.num_probability_models
         self.T=max([pm.data.get_x_max() for pm in self.probability_models if pm.data is not None])
         self.LOG_T=np.log(self.T)
         self.N=max([pm.data.n for pm in self.probability_models if pm.data is not None])
@@ -66,7 +68,7 @@ class ChangepointModel(object):
         if self.infer_regimes:
             self.regimes_model=RegimeModel(disallow_successive_regimes=disallow_successive_regimes,spike_regimes=spike_regimes)
         self.baseline_changepoint=Changepoint(-float("inf"),0)
-        self.zeroth_regime=Regime([0],inclusion_vector=np.ones(self.num_probability_models,dtype="bool"))
+        self.zeroth_regime=Regime([0])
         self.regimes=[self.zeroth_regime]
         self.set_changepoints([])
         self.regime_lhds=[np.zeros(self.num_probability_models) for _ in range(self.num_regimes)]
@@ -91,9 +93,11 @@ class ChangepointModel(object):
         self.undo_proposal_functions["add_changepoint"]=self.undo_propose_add_changepoint
         self.undo_proposal_functions["change_regime"]=self.undo_propose_change_regime_of_changepoint
 
-    def get_changepoint_index_segment_start_end(self,pm_index,index):
-        start=self.cps[index].data_locations[pm_index]
-        end=self.cps[index+1].data_locations[pm_index] if index<self.num_cps else self.probability_models[pm_index].data.n
+    def get_changepoint_index_segment_start_end(self,pm_index,cp_index):
+        start=self.cps[cp_index].data_locations[pm_index]
+        next_cp_index=next((i for i in range(cp_index+1,self.num_cps+1) if self.regimes[self.cps[i].regime_number].inclusion_vector[pm_index]),self.num_cps+1)
+        end=self.cps[next_cp_index].data_locations[pm_index] if next_cp_index<=self.num_cps else self.probability_models[pm_index].data.n
+#        end=self.cps[cp_index+1].data_locations[pm_index] if cp_index<self.num_cps else self.probability_models[pm_index].data.n
         return((start,end))
 
     def distance_to_rh_cp(self,index):
@@ -273,7 +277,14 @@ class ChangepointModel(object):
         return(self.likelihood)
 
     def get_effective_changepoint_locations(self):
-        return([self.cps[i+1].tau for i in range(self.num_cps) if self.cps[i+1].regime_number!=self.cps[i].regime_number])
+        regime_number=0
+        effective_cps=[]
+        for i in range(1,self.num_cps+1):
+            if self.cps[i].regime_number!=regime_number and any(self.regimes[self.cps[i].regime_number].inclusion_vector):
+                regime_number=self.cps[i].regime_number
+                effective_cps+=[self.cps[i].tau]
+
+        return(effective_cps)
 
     def calculate_prior(self):
         self.prior=self.changepoint_prior.likelihood(y=self.num_cps)
