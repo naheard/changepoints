@@ -9,6 +9,8 @@ class ProbabilityModel(ABC):
         self.parameters=parameters
 
     def likelihood(self,start_end=[(0,None)],y=None):
+        if len(start_end)==0:
+            return(0)
         lhd=0
         if self.data is not None:
             for j in range(self.data.p):

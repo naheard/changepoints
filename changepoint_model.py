@@ -27,8 +27,9 @@ class Changepoint(object):
         return(self.tau<other.tau)
 
 class Regime(object):
-    def __init__(self,cp_indices):
+    def __init__(self,cp_indices,inclusion_vector=None):
         self.cp_indices=cp_indices
+        self.inclusion_vector=inclusion_vector
 
     def __lt__(self,other):#find which regime occurs first
         return(self.cp_indices[0]<other.cp_indices[0])
@@ -62,7 +63,9 @@ class ChangepointModel(object):
         self.changepoint_prior=PoissonGamma(alpha_beta=[.01,10])
         if self.infer_regimes:
             self.regimes_model=RegimeModel(disallow_successive_regimes=disallow_successive_regimes,spike_regimes=spike_regimes)
-        self.baseline_changepoint=Changepoint(-float("inf"),self.probability_models)
+        self.baseline_changepoint=Changepoint(-float("inf"),self.probability_models,0)
+        self.zeroth_regime=Regime([0],inclusion_vector=np.ones(self.num_probability_models,dtype="bool"))
+        self.regimes=[self.zeroth_regime]
         self.set_changepoints([])
         self.regime_lhds=[np.zeros(self.num_probability_models) for _ in range(self.num_regimes)]
         self.affected_regimes=self.revised_affected_regimes=None
@@ -99,11 +102,11 @@ class ChangepointModel(object):
         self.cps=np.sort(np.array([self.baseline_changepoint]+[Changepoint(t,self.probability_models) for t in tau],dtype=Changepoint))
         self.num_cps=len(self.cps)-1
         if regimes is None:
-            self.regimes=[Regime([_]) for _ in range(self.num_cps+1)]
+            self.regimes=[self.zeroth_regime]+[Regime([_+1]) for _ in range(self.num_cps)]
         else:
             self.regimes=[Regime(r) for r in regimes]
         self.num_regimes=len(self.regimes)
-        for r_i in range(self.num_regimes):
+        for r_i in range(1,self.num_regimes):
             for i in self.regimes[r_i].cp_indices:
                 self.cps[i].regime_number=r_i
 
@@ -351,17 +354,17 @@ class ChangepointModel(object):
 
     def propose_shift_changepoint(self,index=None):
         self.proposed_index=index if index is not None else (1 if self.num_cps==1 else np.random.randint(1,self.num_cps+1))
-        self.stored_tau=self.cps[self.proposed_index].tau
+        self.stored_cp=self.cps[self.proposed_index]
         left_boundary=self.cps[self.proposed_index-1].tau if self.proposed_index>1 else 0
         right_boundary=self.cps[self.proposed_index+1].tau if self.proposed_index<self.num_cps else self.T
-        t=np.random.uniform(left_boundary,right_boundary)
         self.revised_affected_regimes=self.affected_regimes=[self.cps[self.proposed_index-1].regime_number,self.cps[self.proposed_index].regime_number]
         self.store_affected_regime_lhds()
-        self.shift_changepoint(self.proposed_index,t)
+        t=np.random.uniform(left_boundary,right_boundary)
+        self.cps[self.proposed_index]=Changepoint(t,self.probability_models,regime_number=self.cps[self.proposed_index].regime_number)
         self.calculate_posterior(self.revised_affected_regimes)
 
     def undo_propose_shift_changepoint(self):
-        self.shift_changepoint(self.proposed_index,self.stored_tau)
+        self.cps[self.proposed_index]=self.stored_cp
         for r in self.affected_regimes:
             self.regime_lhds[r]=self.stored_regime_lhds[r]
         self.calculate_posterior(regimes=[])
