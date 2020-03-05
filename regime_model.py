@@ -24,6 +24,9 @@ class RegimeModel(ProbabilityModel):
                 num_regimes+=1
         return(regimes)
 
+    def simulate_data(self,n):
+        return(sample_parameter())
+
     def log_density(self,y):
         if y[0]!=0 or self.disallow_successive_regimes and 0 in np.diff(y):
             return(-float("inf"))#first regime must be zero
