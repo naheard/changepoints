@@ -12,13 +12,17 @@ class MultinomialDirichlet(ProbabilityModel):
             self.data.calculate_unique_categories()
             self.k=self.data.num_categories
 
-        self.alphas=alpha if hasattr(alpha, "__len__") else np.array([np.repeat(alpha,self.k[j]) for j in range(self.data.p)])
+        self.alphas=alpha if hasattr(alpha, "__len__") else np.array([np.repeat(alpha,self.k[j]) for j in range(len(k))])
         self.alpha_dots=np.array([sum(a) for a in self.alphas])
-        self.data.calculate_y_cumulative_counts(self.k)
+        if self.data is not None:
+            self.data.calculate_y_cumulative_counts(self.k)
 
     def likelihood_j(self,j=0,start_end=[(0,None)],y=None):
         counts=y if y is not None else self.data.get_combined_y_cumulative_counts(j,start_end)
         return(self.log_density(counts,self.alphas[j],self.alpha_dots[j]))
+
+    def sample_parameter(self):
+        return(np.random.dirichlet(self.alphas))
 
     def log_density(self,counts,alphas,alpha_dot=None):
         n_dot=sum(counts)

@@ -351,7 +351,7 @@ class ChangepointModel(object):
 #            self.undo_move()
 
     def propose_shift_changepoint(self,index=None):
-        self.proposed_index=index if index is not None else (1 if self.num_cps==1 else np.random.randint(1,self.num_cps))
+        self.proposed_index=index if index is not None else (1 if self.num_cps==1 else np.random.randint(1,self.num_cps+1))
         self.stored_tau=self.cps[self.proposed_index].tau
         left_boundary=self.cps[self.proposed_index-1].tau if self.proposed_index>1 else 0
         right_boundary=self.cps[self.proposed_index+1].tau if self.proposed_index<self.num_cps else self.T
@@ -415,7 +415,6 @@ class ChangepointModel(object):
 #                regime_number=np.random.randint(self.num_regimes+1)
                 regime_number,regime_log_proposal=self.regimes_model.propose_regime(self.num_regimes,self.cps[self.proposed_index-1].regime_number,None if self.proposed_index==self.num_cps+1 else self.cps[self.proposed_index].regime_number)
                 self.proposal_ratio-=regime_log_proposal
-                regime_number=np.random.randint(self.num_regimes)
                 if regime_number==self.cps[self.proposed_index-1].regime_number:
                     regime_number=self.num_regimes
         self.affected_regimes=[self.cps[self.proposed_index-1].regime_number]
@@ -436,7 +435,7 @@ class ChangepointModel(object):
         self.calculate_posterior(regimes=[])
 
     def propose_change_regime_of_changepoint(self,index=None,new_regime_number=None):
-        self.proposed_index=index if index is not None else (2 if self.num_cps==2 else np.random.randint(2,self.num_cps))#first two cps have regimes 0 and 1 resp.
+        self.proposed_index=index if index is not None else (2 if self.num_cps==2 else np.random.randint(2,self.num_cps+1))#first two cps have regimes 0 and 1 resp.
         regime_number=self.cps[self.proposed_index].regime_number
         if new_regime_number is None:
             new_regime_number,regime_log_proposal=self.regimes_model.propose_regime(self.num_regimes,self.cps[self.proposed_index-1].regime_number,None if self.proposed_index==self.num_cps else self.cps[self.proposed_index+1].regime_number,regime_number)

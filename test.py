@@ -5,7 +5,7 @@ from poisson_gamma import PoissonGamma
 from changepoint_model import ChangepointModel
 import numpy as np
 
-dat=Data.from_arguments('y.txt','x.txt',dtype=int,xdtype=float)
+dat=Data.from_arguments('y_0.txt','x_0.txt',dtype=int,xdtype=float)
 md=MultinomialDirichlet(dat,alpha=.01)
 pg=PoissonGamma(dat,alpha_beta=[.01,.01])
 tau=np.loadtxt('tau.txt')

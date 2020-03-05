@@ -15,6 +15,15 @@ class RegimeModel(ProbabilityModel):
             return self.log_density(y)
         return(0)
 
+    def sample_parameter(self,n=1):
+        regimes=np.zeros(n,dtype=int)
+        num_regimes=1
+        for i in range(1,n):
+            regimes[i]=np.random.randint(num_regimes+1)
+            if regimes[i]==num_regimes:
+                num_regimes+=1
+        return(regimes)
+
     def log_density(self,y):
         if y[0]!=0 or self.disallow_successive_regimes and 0 in np.diff(y):
             return(-float("inf"))#first regime must be zero

@@ -22,6 +22,10 @@ class ProbabilityModel(ABC):
     def likelihood_j(self,j=0,start_end=[(0,None)],y=None):
         pass #A likelihood function for the jth row of data.y, taking several slices starting and ending at the positions of start_end
 
+    @abstractmethod
+    def sample_parameter(self):
+        pass
+
     def find_data_position(self,t):
         if self.data is None:
             position=0

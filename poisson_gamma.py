@@ -17,6 +17,9 @@ class PoissonGamma(ProbabilityModel):
         n=1 if y is not None else sum([e-s for s,e in start_end])
         return(self.log_density(r,n))
 
+    def sample_parameter(self):
+        return(np.random.gamma(self.a0,self.b0))
+
     def log_density(self,r,n=1):
         ld_terms_zero=self.a0*np.log(self.b0/(self.b0+float(n)))
         ld=ld_terms_zero+self.density_constant+(0 if r==0 else (gammaln(self.a0+r)-r*np.log(self.b0+n)))
