@@ -12,7 +12,6 @@ class Changepoint(object):
         self.probability_models=probability_models
         if probability_models is not None:
             self.find_data_positions()
-#        self.indicators=None
         self.regime_number=regime_number
 
     def find_data_positions(self,t=None):
