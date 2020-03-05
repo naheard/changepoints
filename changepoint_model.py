@@ -87,11 +87,13 @@ class ChangepointModel(object):
         self.proposal_functions["delete_changepoint"]=self.propose_delete_changepoint
         self.proposal_functions["add_changepoint"]=self.propose_add_changepoint
         self.proposal_functions["change_regime"]=self.propose_change_regime_of_changepoint
+        self.proposal_functions["change_regime_inclusion"]=self.propose_change_regime_inclusion_vector
         self.undo_proposal_functions={}
         self.undo_proposal_functions["shift_changepoint"]=self.undo_propose_shift_changepoint
         self.undo_proposal_functions["delete_changepoint"]=self.undo_propose_delete_changepoint
         self.undo_proposal_functions["add_changepoint"]=self.undo_propose_add_changepoint
         self.undo_proposal_functions["change_regime"]=self.undo_propose_change_regime_of_changepoint
+        self.undo_proposal_functions["change_regime_inclusion"]=self.undo_propose_change_regime_inclusion_vector
 
     def get_changepoint_index_segment_start_end(self,pm_index,cp_index):
         start=self.cps[cp_index].data_locations[pm_index]
@@ -341,6 +343,8 @@ class ChangepointModel(object):
             self.available_move_types.append("add_changepoint")
         if self.infer_regimes and self.num_cps>1:
             self.available_move_types.append("change_regime")
+        if self.infer_regimes and self.num_regimes>1:
+            self.available_move_types.append("change_regime_inclusion")
 
     def propose_move(self):
         self.choose_move()
@@ -467,15 +471,31 @@ class ChangepointModel(object):
         copy_affected_regimes=self.affected_regimes[:]
         self.affected_regimes,self.revised_affected_regimes=self.revised_affected_regimes,self.affected_regimes
         self.change_regime_of_changepoint(self.proposed_index,self.num_regimes if len(self.affected_regimes)==1 else self.affected_regimes[0])
-        for r in copy_affected_regimes:
-            if r is not None:
-                self.regime_lhds[r]=self.stored_regime_lhds[r]
+        self.affected_regimes=[r for r in copy_affected_regimes if r is not None]
+        self.recover_affected_regime_lhds()
+        self.calculate_posterior(regimes=[])
+
+    def propose_change_regime_inclusion_vector(self,regime_number=None,pm_index=None):
+        self.proposed_regime_number=np.random.randint(1,self.num_regimes) if regime_number is None else regime_number
+        self.proposed_pm_index=np.random.randint(self.num_probability_models) if pm_index is None else pm_index
+        self.regimes[self.proposed_regime_number].inclusion_vector[self.proposed_pm_index]=not self.regimes[self.proposed_regime_number].inclusion_vector[self.proposed_pm_index]
+        self.revised_affected_regimes=self.affected_regimes=range(self.num_regimes)
+        self.store_affected_regime_lhds()
+        self.calculate_posterior()
+
+    def undo_propose_change_regime_inclusion_vector(self):
+        self.regimes[self.proposed_regime_number].inclusion_vector[self.proposed_pm_index]=not self.regimes[self.proposed_regime_number].inclusion_vector[self.proposed_pm_index]
+        self.recover_affected_regime_lhds()
         self.calculate_posterior(regimes=[])
 
     def store_affected_regime_lhds(self):
         self.stored_regime_lhds={}
         for ar in self.affected_regimes:
             self.stored_regime_lhds[ar]=np.copy(self.regime_lhds[ar])
+
+    def recover_affected_regime_lhds(self):
+        for ar in self.affected_regimes:
+            self.regime_lhds[ar]=self.stored_regime_lhds[ar]
 
     def calculate_posterior_means(self):
         self.mean_num_cps=sum([k*self.num_cps_counter[k] for k in self.num_cps_counter])/sum(self.num_cps_counter.values())
