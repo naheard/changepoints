@@ -6,20 +6,17 @@ from collections import defaultdict,Counter
 from poisson_gamma import PoissonGamma
 from regime_model import RegimeModel
 from bernoulli_beta import BernoulliBeta
+import itertools
 
 class Changepoint(object):
-    probability_models=None
-    num_probability_models=0
-
-    def __init__(self,t,regime_number=None):
+    def __init__(self,t):
         self.tau=t
         if Changepoint.probability_models is not None:
             self.find_data_positions()
-        self.regime_number=regime_number
 
     def find_data_positions(self,t=None):
         t=t if t is not None else self.tau
-        self.data_locations=np.array([pm.find_data_position(t) for pm in Changepoint.probability_models],dtype=int)
+        self.data_locations=np.array([pm.find_data_position(t) for pm in Regime.probability_models],dtype=int)
 
     def set_location(self,t):
         self.tau=t
@@ -30,25 +27,29 @@ class Changepoint(object):
         return(self.tau<other.tau)
 
 class Regime(object):
-    def __init__(self,cp_indices,inclusion_vector=None):
-        self.cp_indices=cp_indices
-        self.inclusion_vector=inclusion_vector if inclusion_vector is not None else np.ones(Changepoint.num_probability_models,dtype="bool")
+    probability_models=None
+    num_probability_models=0
+    def __init__(self,cps,inclusion_vector=None,lhds=None):
+        self.cps=cps
+        self.inclusion_vector=inclusion_vector if inclusion_vector is not None else np.ones(Regime.num_probability_models,dtype="bool")
+        self.lhds=lhds if lhds is not None else np.zeros(Regime.num_probability_models,dtype="float")
+        self.stored_lhds=np.copy(self.lhds)
 
     def __lt__(self,other):#find which regime occurs first
-        return(self.cp_indices[0]<other.cp_indices[0])
+        return(self.cps[0]<other.cps[0])
 
-    def find_position(self,cp_i):
-        return(np.searchsorted(self.cp_indices,cp_i))
+    def find_position(self,cp):
+        return(np.searchsorted(self.cps,cp))
 
-    def insert_cp_index(self,cp_i):
-        position=self.find_position(cp_i)
-        self.cp_indices.insert(position,cp_i)
+    def insert_cp(self,cp):
+        position=self.find_position(cp)
+        self.cps.insert(position,cp)
 
-    def remove_cp_index(self,cp_i):
-        self.cp_indices.remove(cp_i)
+    def remove_cp(self,cp):
+        self.cps.remove(cp)
 
     def length(self):
-        return(len(self.cp_indices))
+        return(len(self.cps))
 
     def model_is_active(self,pm_i):
         return(self.inclusion_vector[pm_i] if self.inclusion_vector is not None else True)
@@ -63,17 +64,29 @@ class Regime(object):
         if self.inclusion_vector is None:
             return(None)
         n_active=np.count_nonzero(self.inclusion_vector)
-        return([Changepoint.num_probability_models-n_active,n_active])
+        return([Regime.num_probability_models-n_active,n_active])
+
+    def set_model_lhd(self,pm_i,val):
+        self.stored_lhds[pm_i]=self.lhds[pm_i]
+        self.lhds[pm_i]=val
+
+    def get_total_lhd(self):
+        return(sum([self.lhds[pm_i] for pm_i in range(Regime.num_probability_models) if self.model_is_active(pm_i)]))
+
+    def revert_model_lhds(self):
+        for pm_i in range(Regime.num_probability_models):
+            if self.model_is_active(pm_i):
+                self.lhds[pm_i]=self.stored_lhds[pm_i]
 
     def write(self,stream=sys.stdout,delim=" "):
-        stream.write(delim.join(map(str,self.cp_indices))+"\n")
+        stream.write(delim.join(map(str,[cp.tau for cp in self.cps]))+"\n")
 
 class ChangepointModel(object):
     def __init__(self,probability_models=np.array([],dtype=ProbabilityModel),infer_regimes=False,disallow_successive_regimes=True,spike_regimes=False):
         self.probability_models=probability_models
         self.num_probability_models=len(self.probability_models)
-        Changepoint.probability_models=self.probability_models
-        Changepoint.num_probability_models=self.num_probability_models
+        Regime.probability_models=self.probability_models
+        Regime.num_probability_models=self.num_probability_models
         self.T=max([pm.data.get_x_max() for pm in self.probability_models if pm.data is not None])
         self.LOG_T=np.log(self.T)
         self.N=max([pm.data.n for pm in self.probability_models if pm.data is not None])
@@ -84,16 +97,13 @@ class ChangepointModel(object):
         self.inclusion_prior=None#BernoulliBeta(alpha_beta=[.01,10])
         if self.infer_regimes:
             self.regimes_model=RegimeModel(disallow_successive_regimes=disallow_successive_regimes,spike_regimes=spike_regimes)
-        self.baseline_changepoint=Changepoint(-float("inf"),0)
-        self.zeroth_regime=Regime([0],np.ones(Changepoint.num_probability_models,dtype="bool"))
+        self.regime_of_changepoint={}
+        self.zeroth_regime=Regime([0],np.ones(Regime.num_probability_models,dtype="bool"))
         self.regimes=[self.zeroth_regime]
+        self.baseline_changepoint=Changepoint(-float("inf"))
+        self.regime_of_changepoint[self.baseline_changepoint]=self.zeroth_regime
         self.set_changepoints([])
-        self.regime_lhds=[np.zeros(self.num_probability_models) for _ in range(self.num_regimes)]
         self.affected_regimes=self.revised_affected_regimes=None
-        self.arpm=defaultdict(list)#affected regimes for each prob. model
-        self.r_arpm=defaultdict(list)#revised affected regimes for each prob. model
-        self.arpm_indices=[None] if self.inclusion_prior is None else range(self.num_probability_models)
-        self.deleted_regime_lhd=None
         self.move_type=None
         self.calculate_posterior()#calculate likelihoods for each prob. model
         self.create_mh_dictionary()
@@ -115,232 +125,152 @@ class ChangepointModel(object):
         self.undo_proposal_functions["change_regime"]=self.undo_propose_change_regime_of_changepoint
         self.undo_proposal_functions["change_regime_inclusion"]=self.undo_propose_change_regime_inclusion_vector
 
-    def get_changepoint_index_segment_start_end(self,pm_index,cp_index):
-        start=self.cps[cp_index].data_locations[pm_index]
-        next_cp_index=self.get_active_cp_to_right(cp_index,pm_index)#next((i for i in range(cp_index+1,self.num_cps+1) if self.regimes[self.cps[i].regime_number].model_is_active(pm_index)),self.num_cps+1)
+    def get_changepoint_segment_start_end(self,pm_index,cp):
+        cp_index=self.cps.index(cp)
+        start=cp.data_locations[pm_index]
+        next_cp_index=self.get_active_cp_to_right(cp_index,pm_index)
         end=self.cps[next_cp_index].data_locations[pm_index] if next_cp_index<=self.num_cps else self.probability_models[pm_index].data.n
-#        end=self.cps[cp_index+1].data_locations[pm_index] if cp_index<self.num_cps else self.probability_models[pm_index].data.n
         return((start,end))
 
     def get_active_cp_to_right(self,cp_index,pm_index=None):
         if pm_index is None:
             return(cp_index+1)
-        return(next((i for i in range(cp_index+1,self.num_cps+1) if self.regimes[self.cps[i].regime_number].model_is_active(pm_index)),self.num_cps+1))
+        return(next((i for i in range(cp_index+1,self.num_cps+1) if self.cps[i].regime.model_is_active(pm_index)),self.num_cps+1))
 
     def get_active_cp_to_left(self,cp_index,pm_index=None):
         if pm_index is None:
             return(cp_index-1)
-        return(next((i for i in range(cp_index-1,-1,-1) if self.regimes[self.cps[i].regime_number].model_is_active(pm_index))))
+        return(next((i for i in range(cp_index-1,-1,-1) if self.cps[i].regime.model_is_active(pm_index))))
 
     def distance_to_rh_cp(self,index):
         rh_cp_location=self.T if index==self.num_cps else self.cps[index+1].tau
         return(rh_cp_location-self.cps[index].tau)
 
-    def set_changepoints(self,tau,regimes=None):
+    def set_changepoints(self,tau,regimes_numbers=None):
+        self.num_cps=len(tau)
         self.cps=np.sort(np.array([self.baseline_changepoint]+[Changepoint(t) for t in tau],dtype=Changepoint))
-        self.num_cps=len(self.cps)-1
-        if regimes is None:
-            self.regimes=[self.zeroth_regime]+[Regime([_+1]) for _ in range(self.num_cps)]
+        if regime_numbers is None:
+            regime_numbers=range(self.num_cps+1)
         else:
-            self.regimes=[Regime(r) for r in regimes]
-        self.num_regimes=len(self.regimes)
-        for r_i in range(1,self.num_regimes):
-            for i in self.regimes[r_i].cp_indices:
-                self.cps[i].regime_number=r_i
+            regime_numbers=[0]+list(regime_numbers)
+        zeroth.regime.cp_indices=numpy.where(regime_numbers==0)
+        self.regimes=[self.zeroth_regime]
+        self.num_regimes=max(regime_numbers)+1
+        for rn in range(1,self.num_regimes):
+            rn_indices=numpy.where(regime_numbers==rn)
+            regime_rn=Regime([self.cps[cp_i] for cp_i in rn_indices])
+            self.regimes+=[regime_rn]
+            for cp in regime_rn:
+                regime_of_changepoint[cp]=regime_rn
 
-        self.regime_lhds=[np.zeros(self.num_probability_models) for _ in range(self.num_regimes)]
-
-    def find_position_in_changepoints(self,t):
-        position=np.searchsorted(self.cps,Changepoint(t))
+    def find_position_in_changepoints(self,t=None,cp=None):
+        if cp is None:
+            cp=Changepoint(t)
+        position=np.searchsorted(self.cps,cp))
         return(position)
 
-    def find_position_in_regimes(self,cp_indices):
-        position=np.searchsorted(self.regimes,Regime(cp_indices))
+    def find_position_in_regimes(self,cps=None,regime=None):
+        if regime is None:
+            regime=Regime(cps)
+        position=np.searchsorted(self.regimes,regime)
         return(position)
+
+    def order_regimes(self):
+        self.regimes=np.sort(self.regimes)
 
     def write_changepoints_and_regimes(self,stream=sys.stderr,delim="\t"):
-        stream.write(delim.join([":".join(map(str,(cp.tau,cp.regime_number))) for cp in self.cps])+"\n")
+        self.order_regimes()
+        stream.write(delim.join([":".join(map(str,(cp.tau,np.searchsorted(self.regimes,cp.regime)))) for cp in self.cps])+"\n")
 
     def write_regime_inclusion_vectors(self,stream=sys.stderr,delim="\t"):
+        self.order_regimes()
         try:
             stream.write(delim.join([str(r_i)+":"+",".join(map(str,self.regimes[r_i].inclusion_vector)) for r_i in range(self.num_regimes)])+"\n")
         except:
             None
 
     def write_regimes(self,stream=sys.stdout,delim=" "):
-        for r_i in self.regimes:
-            r_i.write(stream,delim)
+        for r in self.regimes:
+            r.write(stream,delim)
 
-    def loop_arpm_indices(self,l_fn):
-        if self.arpm_indices==[None]:
-            l_fn()
-            return()
-        for ii in self.arpm_indices:
-            self.affected_regime=self.arpm[ii]
-            self.revised_affected_regime=r_self.arpm[ii]
-            l_fn()
-
-    def delete_regime(self,regime_index):
-        self.deleted_regime_index=regime_index
-        self.deleted_regime_lhd=self.regime_lhds[regime_index]
-        del self.regime_lhds[regime_index]
-        for r_i in range(regime_index+1,self.num_regimes):
-            for cp_i in self.regimes[r_i].cp_indices:
-                self.cps[cp_i].regime_number-=1
-        del self.regimes[regime_index]
+    def delete_regime(self,regime):
+        self.deleted_regime=regime
+        self.regimes.remove(regime)
         self.num_regimes-=1
 
-        def l_fn():
-            if self.affected_regimes is not None:
-                self.revised_affected_regimes=[]
-                for r in self.affected_regimes:
-                    if r!=regime_index:
-                        self.revised_affected_regimes.append(r if r<regime_index else r-1)
-
-        self.loop_arpm_indices(l_fn)
-
-    def add_regime(self,cp_indices,regime_index=None):
-        if regime_index is None:
-            regime_index=self.find_position_in_regimes(cp_indices)
-        inclusion_vector=None
-        if self.inclusion_prior is not None:
-            inclusion_vector=self.sample_inclusion_vector()
-        self.regimes.insert(regime_index,Regime(cp_indices,inclusion_vector))
+    def add_regime(self,regime):
+        self.added_regime=regime
+        self.regimes.insert(self.find_position_in_regimes(regime),regime)
         self.num_regimes+=1
-        for i in cp_indices:
-            self.cps[i].regime_number=regime_index
 
-        self.regime_lhds.insert(regime_index,np.zeros(self.num_probability_models) if self.deleted_regime_lhd is None else self.deleted_regime_lhd)
-        for r_i in range(regime_index+1,self.num_regimes):
-            for cp_i in self.regimes[r_i].cp_indices:
-                self.cps[cp_i].regime_number+=1
-
-    def move_regime_position(self,rn1,rn2): #move regime from postion rn1 to position rn2
-        if rn1<=rn2:
-            for r_i in range(rn1+1,rn2+1):
-                for cp_i in self.regimes[r_i].cp_indices:
-                    self.cps[cp_i].regime_number-=1
-
-            self.switch_regimes(rn1,rn2)
-        else:
-            for r_i in range(rn2,rn1):
-                for cp_i in self.regimes[r_i].cp_indices:
-                    self.cps[cp_i].regime_number+=1
-
-            self.switch_regimes(rn1,rn2)
-
-    def switch_regimes(self,rn1,rn2): # exectute the moving of regime positions
-        self.regimes.insert(rn2,self.regimes.pop(rn1))
-        self.regime_lhds.insert(rn2,self.regime_lhds.pop(rn1))
-        if self.revised_affected_regimes is not None and self.revised_affected_regimes[-1]==rn1:
-            self.revised_affected_regimes[-1]=rn2
-        for cp_i in self.regimes[rn2].cp_indices:
-            self.cps[cp_i].regime_number=rn2
-
-    def update_and_reposition_regimes(self,cp_index=None,from_regime_number=None,to_regime_number=None):
-        new_from_position=new_to_position=None
-        if from_regime_number is not None: #cp is being deleted or moved from
-            if cp_index==self.regimes[from_regime_number].cp_indices[0]: #currently first cp of regime
-                new_from_position=self.find_position_in_regimes(self.regimes[from_regime_number].cp_indices[1:])
-                if new_from_position > from_regime_number:
-                    new_from_position-=1
-                    self.move_regime_position(from_regime_number,new_from_position)
-                    if to_regime_number is not None and from_regime_number < to_regime_number and to_regime_number <= new_from_position:
-                        to_regime_number-=1
-                    if self.revised_affected_regimes is not None:
-                        for r_i in range(len(self.revised_affected_regimes)):
-                            if from_regime_number < self.revised_affected_regimes[r_i] and self.revised_affected_regimes[r_i] < new_from_position:
-                                self.revised_affected_regimes[r_i]-=1
-            else:
-                new_from_position=from_regime_number
-            self.regimes[new_from_position].remove_cp_index(cp_index)
-
-        if to_regime_number is not None: #cp is being added or moved to
-            if to_regime_number==self.num_regimes or self.regimes[to_regime_number].find_position(cp_index)==0: #will be first cp of regime
-                new_to_position=self.find_position_in_regimes([cp_index])
-                if to_regime_number==self.num_regimes:
-                    self.add_regime([],self.num_regimes)
-                if new_to_position < to_regime_number:
-                    self.move_regime_position(to_regime_number,new_to_position)
-                    if new_from_position is not None and new_to_position <= new_from_position and new_from_position < to_regime_number:
-                        new_from_position+=1
-                    if self.revised_affected_regimes is not None:
-                        for r_i in range(len(self.revised_affected_regimes)):
-                            if new_to_position < self.revised_affected_regimes[r_i] and self.revised_affected_regimes[r_i] < to_regime_number:
-                                self.revised_affected_regimes[r_i]+=1
-            else:
-                new_to_position=to_regime_number
-            self.regimes[new_to_position].insert_cp_index(cp_index)
-            self.cps[cp_index].regime_number=new_to_position
-        return([new_from_position,new_to_position])
-
-    def add_changepoint_index_to_regime(self,index,regime_number):
+    def add_changepoint_to_regime(self,cp,regime_number):
         if regime_number==self.num_regimes:
-            self.add_regime([index])
+            if self.inclusion_prior is not None:
+                inclusion_vector=self.sample_inclusion_vector()
+            self.new_regime=Regime([cp])
+            self.add_regime(self.new_regime)
+            regime_of_changepoint[cp]=self.new_regime
         else:
             regime_number=self.update_and_reposition_regimes(index,None,regime_number)[1]
         return(regime_number)
 
     def delete_changepoint(self,index):
         if index==0:
-            sys.exit('Error! Cannot delete basline changepoint')
-        regime_number=self.cps[index].regime_number
-        if self.regimes[regime_number].length()==1:
-            self.delete_regime(regime_number)
+            sys.exit('Error! Cannot delete baseline changepoint')
+        cp=self.cps[index]
+        regime=regime_of_changepoint[cp]
+        if regime.length()==1:
+            self.delete_regime(regime)
         else:
-            self.update_and_reposition_regimes(index,regime_number,None)
+            regime.cps.remove(cp)
+        self.stored_changepoint=cp
         self.cps=np.delete(self.cps,index)
         self.num_cps-=1
-        for r in self.regimes:
-            for i in range(r.length()):
-                if r.cp_indices[i]>index:
-                    r.cp_indices[i]-=1
 
-    def add_changepoint(self,t=None,regime_number=None,cp=None,index=None):
-        self.proposed_index=index if index is not None else self.find_position_in_changepoints(t)
+    def add_changepoint(self,t=None,regime=None,cp=None,index=None):
         if cp is None:
-            cp=Changepoint(t,regime_number)
+            cp=Changepoint(t)
+        self.proposed_index=index if index is not None else self.find_position_in_changepoints(cp)
         self.cps=np.insert(self.cps,self.proposed_index,cp)
         self.num_cps+=1
-        for r in self.regimes:
-            for i in range(r.length()):
-                if r.cp_indices[i]>=self.proposed_index:
-                    r.cp_indices[i]+=1
-        if regime_number is None:
-            regime_number=self.num_regimes
-        self.add_changepoint_index_to_regime(self.proposed_index,regime_number)
+        self.stored_changepoint=cp
+        self.add_cp_to_regime(cp,regime)
+
+    def add_cp_to_regime(self,cp,regime=None):
+        if regime is None:
+            regime=Regime([cp])
+            self.add_regime(regime)
+        else:
+            regime.insert_cp(cp)
+        self.regime_of_changepoint[cp]=regime
 
     def shift_changepoint(self,index,t):
         self.cps[index].set_location(t)
 
-    def change_regime_of_changepoint(self,index,new_regime_number):
-        regime_number=self.cps[index].regime_number
-        if self.regimes[regime_number].length()==1:
-            self.delete_regime(regime_number)
-            if regime_number<new_regime_number:
-                new_regime_number-=1
-            return([self.add_changepoint_index_to_regime(index,new_regime_number)])
-        else:
-            return(self.update_and_reposition_regimes(index,regime_number,new_regime_number))
+    def change_regime_of_changepoint(self,cp,new_regime=None):
+        self.stored_regime=self.regime_of_changepoint[cp]
+        if self.stored_regime.length()==1:
+            self.delete_regime(self.stored_regime)
+        self.add_cp_to_regime(cp,new_regime)
 
-    def calculate_likelihood(self,regimes=None):
+    def calculate_likelihood(self,regime_model_pairs=None):
         if self.inclusion_prior is not None:
-            regimes=None
-        for pm_i in range(self.num_probability_models):
-            for r_i in (range(self.num_regimes) if regimes is None else np.unique(regimes)):
-                if self.regimes[r_i].model_is_active(pm_i):
-                    start_end=[self.get_changepoint_index_segment_start_end(pm_i,j) for j in self.regimes[r_i].cp_indices]
-#                    print(pm_i,r_i,start_end)
-                    self.regime_lhds[r_i][pm_i]=self.probability_models[pm_i].likelihood(start_end)
-        self.likelihood=sum([sum(lr) for lr in self.regime_lhds])
+            regime_model_pairs=None
+        if regime_model_pairs is None:
+            regime_model_pairs=list(itertools.product(self.regimes,range(self.num_probability_models)))
+        for r,pm_i in regime_model_pairs:
+            if r.model_is_active(pm_i):
+                start_end=[self.get_changepoint_segment_start_end(pm_i,cp) for cp in r.cps]
+                r.set_model_lhd(self,pm_i,self.probability_models[pm_i].likelihood(start_end))
+        self.likelihood=sum([r.get_total_lhd() for r in self.regimes])
         return(self.likelihood)
 
     def get_effective_changepoint_locations(self):
-        regime_number=0
+        regime=self.zeroth_regime
         effective_cps=[]
         for i in range(1,self.num_cps+1):
-            if self.cps[i].regime_number!=regime_number and self.regimes[self.cps[i].regime_number].is_active():
-                regime_number=self.cps[i].regime_number
+            if self.cps[i].regime!=regime and self.cps[i].regime.is_active():
+                regime=self.cps[i].regime
                 effective_cps+=[self.cps[i].tau]
 
         return(effective_cps)
@@ -350,7 +280,7 @@ class ChangepointModel(object):
         if self.num_cps>0 and min([self.distance_to_rh_cp(i) for i in range(self.num_cps+1)])<self.min_cp_spacing:
             self.prior=-float("inf")
         if self.infer_regimes:
-            self.regime_sequence=[self.cps[i].regime_number for i in range(self.num_cps+1)]
+            self.regime_sequence=create_numbering([self.cps[i].regime for i in range(self.num_cps+1)])
             regime_prior=self.regimes_model.likelihood(y=self.regime_sequence)
             self.prior+=regime_prior
             if self.inclusion_prior is not None:
@@ -360,9 +290,9 @@ class ChangepointModel(object):
                         self.prior+=self.inclusion_prior.likelihood(y=inclusion_counts)
         return(self.prior)
 
-    def calculate_posterior(self,regimes=None):
+    def calculate_posterior(self,regime_model_pairs=None):
         self.calculate_prior()
-        self.calculate_likelihood(regimes=regimes)
+        self.calculate_likelihood(regime_model_pairs=regime_model_pairs)
         self.posterior=self.prior+self.likelihood
         return(self.posterior)
 
@@ -554,7 +484,8 @@ class ChangepointModel(object):
     def store_affected_regime_lhds(self):
         self.stored_regime_lhds={}
         for ar in self.affected_regimes:
-            self.stored_regime_lhds[ar]=np.copy(self.regime_lhds[ar])
+            for pm_i in range(self.num_probability_models):
+                self.stored_regime_lhds[ar,pm_i]=self.regime_lhds[ar,pm_i]
 
     def recover_affected_regime_lhds(self):
         for ar in self.affected_regimes:
@@ -577,3 +508,17 @@ class ChangepointModel(object):
 
 def significantly_different(x,y,epsilon=1e-5):
     return(np.abs(x-y)>epsilon)
+
+def create_numbering(x):
+    if len(x)==0:
+        return([])
+    z=np.zeros(len(x),dtype=int)
+    x_vals={}
+    x_vals[x[0]]=0
+    for i in range(1,len(x)):
+        if x[i] not in x_vals:
+            x_vals[x_i]=len(x_vals)
+        z[i]=x_vals[x[i]]
+
+    return(z)
+
