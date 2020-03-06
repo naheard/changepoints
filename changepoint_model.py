@@ -81,7 +81,7 @@ class ChangepointModel(object):
         self.min_cp_spacing=float(self.T)/self.N
         self.infer_regimes=infer_regimes
         self.changepoint_prior=PoissonGamma(alpha_beta=[.01,10])
-        self.inclusion_prior=BernoulliBeta(alpha_beta=[.01,10])
+        self.inclusion_prior=None#BernoulliBeta(alpha_beta=[.01,10])
         if self.infer_regimes:
             self.regimes_model=RegimeModel(disallow_successive_regimes=disallow_successive_regimes,spike_regimes=spike_regimes)
         self.baseline_changepoint=Changepoint(-float("inf"),0)
@@ -90,6 +90,9 @@ class ChangepointModel(object):
         self.set_changepoints([])
         self.regime_lhds=[np.zeros(self.num_probability_models) for _ in range(self.num_regimes)]
         self.affected_regimes=self.revised_affected_regimes=None
+        self.arpm=defaultdict(list)#affected regimes for each prob. model
+        self.r_arpm=defaultdict(list)#revised affected regimes for each prob. model
+        self.arpm_indices=[None] if self.inclusion_prior is None else range(self.num_probability_models)
         self.deleted_regime_lhd=None
         self.move_type=None
         self.calculate_posterior()#calculate likelihoods for each prob. model
@@ -168,6 +171,15 @@ class ChangepointModel(object):
         for r_i in self.regimes:
             r_i.write(stream,delim)
 
+    def loop_arpm_indices(self,l_fn):
+        if self.arpm_indices==[None]:
+            l_fn()
+            return()
+        for ii in self.arpm_indices:
+            self.affected_regime=self.arpm[ii]
+            self.revised_affected_regime=r_self.arpm[ii]
+            l_fn()
+
     def delete_regime(self,regime_index):
         self.deleted_regime_index=regime_index
         self.deleted_regime_lhd=self.regime_lhds[regime_index]
@@ -177,11 +189,15 @@ class ChangepointModel(object):
                 self.cps[cp_i].regime_number-=1
         del self.regimes[regime_index]
         self.num_regimes-=1
-        if self.affected_regimes is not None:
-            self.revised_affected_regimes=[]
-            for r in self.affected_regimes:
-                if r!=regime_index:
-                     self.revised_affected_regimes.append(r if r<regime_index else r-1)
+
+        def l_fn():
+            if self.affected_regimes is not None:
+                self.revised_affected_regimes=[]
+                for r in self.affected_regimes:
+                    if r!=regime_index:
+                        self.revised_affected_regimes.append(r if r<regime_index else r-1)
+
+        self.loop_arpm_indices(l_fn)
 
     def add_regime(self,cp_indices,regime_index=None):
         if regime_index is None:
@@ -310,8 +326,8 @@ class ChangepointModel(object):
     def calculate_likelihood(self,regimes=None):
         if self.inclusion_prior is not None:
             regimes=None
-        for r_i in (range(self.num_regimes) if regimes is None else np.unique(regimes)):# if self.affected_regimes is None else affected_regimes:
-            for pm_i in range(self.num_probability_models):
+        for pm_i in range(self.num_probability_models):
+            for r_i in (range(self.num_regimes) if regimes is None else np.unique(regimes)):
                 if self.regimes[r_i].model_is_active(pm_i):
                     start_end=[self.get_changepoint_index_segment_start_end(pm_i,j) for j in self.regimes[r_i].cp_indices]
 #                    print(pm_i,r_i,start_end)
