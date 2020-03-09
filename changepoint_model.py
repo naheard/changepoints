@@ -104,7 +104,7 @@ class ChangepointModel(object):
         self.min_cp_spacing=float(self.T)/self.N
         self.infer_regimes=infer_regimes
         self.changepoint_prior=PoissonGamma(alpha_beta=[.01,10])
-        self.inclusion_prior=None#BernoulliBeta(alpha_beta=[.01,10])
+        self.inclusion_prior=None if self.num_probability_models==1 else BernoulliBeta(alpha_beta=[.01,10])
         if self.infer_regimes:
             self.regimes_model=RegimeModel(disallow_successive_regimes=disallow_successive_regimes,spike_regimes=spike_regimes)
         self.regime_of_changepoint={}
@@ -390,7 +390,10 @@ class ChangepointModel(object):
         return(1 if self.num_cps==1 else np.random.randint(1,self.num_cps+1))
 
     def undo_lhd_changes(self):
-        for r,pm_i in self.affected_regime_model_pairs:
+        regime_model_pairs=self.affected_regime_model_pairs
+        if regime_model_pairs is None:
+            regime_model_pairs=list(itertools.product(self.regimes,range(self.num_probability_models)))
+        for r,pm_i in regime_model_pairs:
             r.revert_model_lhd(pm_i)
 
     def propose_shift_changepoint(self,cp_index=None):
@@ -507,8 +510,6 @@ class ChangepointModel(object):
         self.proposed_regime_number=np.random.randint(1,self.num_regimes) if regime_number is None else regime_number
         self.proposed_pm_index=np.random.randint(self.num_probability_models) if pm_index is None else pm_index
         self.regimes[self.proposed_regime_number].inclusion_vector_flip_position(self.proposed_pm_index)
-        self.revised_affected_regimes=self.affected_regimes=range(self.num_regimes)
-        self.store_affected_regime_lhds()
         self.calculate_posterior()
 
     def sample_inclusion_vector(self):
@@ -516,8 +517,8 @@ class ChangepointModel(object):
 
     def undo_propose_change_regime_inclusion_vector(self):
         self.regimes[self.proposed_regime_number].inclusion_vector_flip_position(self.proposed_pm_index)
-        self.recover_affected_regime_lhds()
-        self.calculate_posterior(regimes=[])
+        self.undo_lhd_changes()
+        self.calculate_posterior(regime_model_pairs=[])
 
     def store_affected_regime_lhds(self):
         self.stored_regime_lhds={}
