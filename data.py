@@ -53,6 +53,16 @@ class Data(object):
             else:
                 return(np.sum(self.y[j,start:end],axis=1))
 
+    def get_y_sum_squares_between(self,start,end,j=None):
+        #return sum of squares of y[start:end]
+        if self.Sy2 is not None:
+            return(self.get_diff_between(self.Sy2,start,end,j))
+        else:
+            if j is None:
+                return(np.sum(self.y[:,start:end]**2,axis=1))
+            else:
+                return(np.sum(self.y[j,start:end]**2,axis=1))
+
     def get_x_sum_between(self,start,end):
         #return sum of x[start:end]
         if self.Sx is not None:
@@ -65,6 +75,9 @@ class Data(object):
 
     def get_combined_y_sums(self,dim=0,start_end=[(0,None)]):
         return(np.sum([self.get_y_sum_between(start,end,dim) for start,end in start_end],axis=0))
+
+    def get_combined_y_sum_squares(self,dim=0,start_end=[(0,None)]):
+        return(np.sum([self.get_y_sum_squares_between(start,end,dim) for start,end in start_end],axis=0))
 
     def get_combined_x_sums(self,start_end=[(0,None)]):
         return(np.sum([self.get_x_sum_between(start,end) for start,end in start_end],axis=0))
