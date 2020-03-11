@@ -60,6 +60,6 @@ def main():
     cps,regimes=simulate_changepoints_and_regimes(n=n,n_cps=5,inclusion_ps=np.repeat(0.3*0+1,2),seed=None,tau_filename="tau.txt")
     for i in range(len(probability_models)):
         file_ending="_"+str(i)+".txt"
-        simulate_changepoint_data(n=n,y_filename="y"+file_ending,x_filename="x"+file_ending,seed=s,tau=cps,regimes=regimes,model="normal")
+        simulate_changepoint_data(n=n,y_filename="y"+file_ending,x_filename="x"+file_ending,seed=s,tau=cps,regimes=regimes,model="multinomial")#normal")
 
 main()

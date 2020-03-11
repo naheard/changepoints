@@ -3,6 +3,8 @@ from data import Data
 import numpy as np
 from scipy.special import gammaln
 
+LOG_PI=np.log(np.pi)
+
 class NormalNIG(ProbabilityModel):
     def __init__(self,data=None,alpha_beta=(.1,.1),v=1,p=1):
         ProbabilityModel.__init__(self,data,alpha_beta) #y_i~N(mu,sigma**2)
@@ -31,6 +33,6 @@ class NormalNIG(ProbabilityModel):
             mu,sigma=self.sample_parameter()
         return([np.random.normal(mu[i],sigma[i],size=n) for i in range(self.p)])
 
-    def log_density(self,sy,sy2,n=1):
-        ld=self.density_constant+sy
+    def log_density(self,y,y2,n=1):
+        ld=self.density_constant-.5*n*LOG_PI-.5*np.log(1.0/self.v+n)+gammaln(self.a0+.5*n)-(self.a0+.5*n)*np.log(self.b0+0.5*(y2-y*y*(self.v/(n*self.v+1.0))))
         return(ld)
