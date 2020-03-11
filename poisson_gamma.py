@@ -9,7 +9,7 @@ class PoissonGamma(ProbabilityModel):
         self.a0,self.b0=alpha_beta
         self.T=1
         self.p=p if self.data is None else self.data.p
-        self.density_constant=-gammaln(self.a0)
+        self.density_constant=-gammaln(self.a0)+self.a0*np.log(self.b0)
         if self.data is not None:
             self.data.calculate_y_cumulative_sum()
 
@@ -27,6 +27,7 @@ class PoissonGamma(ProbabilityModel):
         return([np.random.poisson(theta,size=n) for theta in thetas])
 
     def log_density(self,r,n=1):
-        ld_terms_zero=self.a0*np.log(self.b0/(self.b0+float(n)))
-        ld=ld_terms_zero+self.density_constant+(0 if r==0 else (gammaln(self.a0+r)-r*np.log(self.b0+n)))
+        if n==0:
+            return(0)
+        ld=self.density_constant+gammaln(self.a0+r)-(self.a0+r)*np.log(self.b0+n*self.T)
         return(ld)
