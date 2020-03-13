@@ -10,7 +10,7 @@ class Data(object):
             self.y=self.y.transpose()
         self.x=None if x is None else np.array(x)
         self.p, self.n=self.y.shape
-        self.Sy = self.Sy2 = self.Sx = self.categories = self.num_categories = self.cum_counts = None
+        self.Sy = self.Sy2 = self.Sx = self.Sxy = self.categories = self.num_categories = self.cum_counts = None
 
     @classmethod
     def from_arguments(cls, yfile, xfile=None, dtype=float, xdtype=float, transpose=False,delim=","):
@@ -35,6 +35,12 @@ class Data(object):
     def calculate_x_cumulative_sum(self):
         if self.x is not None:
             self.Sx=np.cumsum(self.x)
+
+    def calculate_xy_cumulative_sum(self):
+        if self.x is not None:
+            self.Sxy=np.cumsum(np.multiply(self.x,self.y))
+        else:
+            self.Sxy=np.cumsum(np.multiply(range(self.n),self.y))
 
     @staticmethod
     def get_diff_between(mx,start,end,j=None):
@@ -80,6 +86,16 @@ class Data(object):
             else:
                 return(np.sum(self.x[start:end],axis=1))
 
+    def get_xy_sum_between(self,start,end):
+        #return sum of x[start:end]*y[start:end]
+        if self.Sxy is not None:
+            return(self.get_diff_between(self.Sxy,start,end,j))
+        else:
+            if self.x is None:
+                return(np.sum(np.multiply(range(start,end),self.y[start:end])))
+            else:
+                return(np.sum(np.multiply(x[start:end],self.y[start:end])))
+
     def get_combined_y_sums(self,dim=0,start_end=[(0,None)]):
         return(np.sum([self.get_y_sum_between(start,end,dim) for start,end in start_end],axis=0))
 
@@ -91,6 +107,9 @@ class Data(object):
 
     def get_combined_x_sums(self,start_end=[(0,None)]):
         return(np.sum([self.get_x_sum_between(start,end) for start,end in start_end],axis=0))
+
+    def get_combined_xy_sums(self,start_end=[(0,None)]):
+        return(np.sum([self.get_xy_sum_between(start,end) for start,end in start_end],axis=0))
 
     def calculate_unique_categories(self):
         self.categories=[{} for j in range(self.p)]

@@ -17,7 +17,7 @@ class NormalLinearModel(ProbabilityModel):
             self.data.calculate_y_cumulative_sum_sq()
             self.data.calculate_xy_cumulative_sum()
 
-    def likelihood_j(self,j=0,start_end=[(0,None)],y=None,x=None):
+    def likelihood_component(self,j=0,start_end=[(0,None)],y=None,x=None):
         lhd=self.density_constant
         sy=sum(y) if y is not None else self.data.get_combined_y_sums(j,start_end)
         sy2=sum(y*y) if y is not None else self.data.get_combined_y_sum_squares(j,start_end)
