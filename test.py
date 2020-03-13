@@ -3,6 +3,7 @@ from data import Data
 from multinomial_dirichlet import MultinomialDirichlet
 from poisson_gamma import PoissonGamma
 from normal_normal_inverse_gamma import NormalNIG
+from uniform_pareto import UniformPareto
 from changepoint_model import ChangepointModel
 import numpy as np
 
@@ -10,6 +11,7 @@ dat=Data.from_arguments('y_0.txt','x_0.txt',dtype=int,xdtype=float)
 md=MultinomialDirichlet(dat,alpha=.01)
 pg=PoissonGamma(dat,alpha_beta=[.01,.01])
 nig=NormalNIG(dat,alpha_beta=[.01,.01],v=1)
+up=UniformPareto(dat,alpha_beta=[.01,4])
 tau=np.loadtxt('tau.txt')
 #print(md.changepoint_likelihood(tau=tau))
 cpm=ChangepointModel([md],infer_regimes=True,disallow_successive_regimes=True,spike_regimes=not False)#,pg])

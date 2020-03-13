@@ -51,7 +51,14 @@ class Data(object):
             if j is None:
                 return(np.sum(self.y[:,start:end],axis=1))
             else:
-                return(np.sum(self.y[j,start:end],axis=1))
+                return(np.sum(self.y[j,start:end]))
+
+    def get_y_max_between(self,start,end,j=None):
+        #return maximum of y[start:end]
+        if j is None:
+            return(np.max(self.y[:,start:end],axis=1))
+        else:
+            return(np.max(self.y[j,start:end]))
 
     def get_y_sum_squares_between(self,start,end,j=None):
         #return sum of squares of y[start:end]
@@ -75,6 +82,9 @@ class Data(object):
 
     def get_combined_y_sums(self,dim=0,start_end=[(0,None)]):
         return(np.sum([self.get_y_sum_between(start,end,dim) for start,end in start_end],axis=0))
+
+    def get_combined_y_maxs(self,dim=0,start_end=[(0,None)]):
+        return(np.max([self.get_y_max_between(start,end,dim) for start,end in start_end],axis=0))
 
     def get_combined_y_sum_squares(self,dim=0,start_end=[(0,None)]):
         return(np.sum([self.get_y_sum_squares_between(start,end,dim) for start,end in start_end],axis=0))

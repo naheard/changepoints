@@ -10,7 +10,7 @@ class RegimeModel(ProbabilityModel):
         self.disallow_successive_regimes=disallow_successive_regimes
         self.spike_regimes=spike_regimes
 
-    def likelihood_j(self,j=0,start_end=[(0,None)],y=None):
+    def likelihood_component(self,j=0,start_end=[(0,None)],y=None):
         if y is not None:
             return self.log_density(y)
         return(0)

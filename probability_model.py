@@ -14,14 +14,14 @@ class ProbabilityModel(ABC):
         lhd=0
         if self.data is not None:
             for j in range(self.data.p):
-                lhd+=self.likelihood_j(j,start_end)
+                lhd+=self.likelihood_component(j,start_end)
         else:
-            lhd=self.likelihood_j(0,y=y)
+            lhd=self.likelihood_component(0,y=y)
 
         return(lhd)
 
     @abstractmethod
-    def likelihood_j(self,j=0,start_end=[(0,None)],y=None):
+    def likelihood_component(self,j=0,start_end=[(0,None)],y=None):
         pass #A likelihood function for the jth row of data.y, taking several slices starting and ending at the positions of start_end
 
     @abstractmethod

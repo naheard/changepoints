@@ -13,7 +13,7 @@ class PoissonGamma(ProbabilityModel):
         if self.data is not None:
             self.data.calculate_y_cumulative_sum()
 
-    def likelihood_j(self,j=0,start_end=[(0,None)],y=None):
+    def likelihood_component(self,j=0,start_end=[(0,None)],y=None):
         r=y if y is not None else self.data.get_combined_y_sums(j,start_end)
         n=1 if y is not None else sum([e-s for s,e in start_end])
         return(self.log_density(r,n))
