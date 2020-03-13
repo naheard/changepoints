@@ -16,7 +16,7 @@ class UniformPareto(ProbabilityModel):
         return(self.log_density(max_x,n))
 
     def sample_parameter(self):
-        return(np.random.pareto(self.a0,self.b0,size=self.p))
+        return((np.random.pareto(self.a0,size=self.p)+1)*self.b0)
 
     def simulate_data(self,n,thetas=None):
         if thetas is None:
