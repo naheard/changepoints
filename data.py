@@ -10,7 +10,7 @@ class Data(object):
             self.y=self.y.transpose()
         self.x=None if x is None else np.array(x)
         self.p, self.n=self.y.shape
-        self.Sy = self.Sy2 = self.Sx = self.Sxy = self.categories = self.num_categories = self.cum_counts = None
+        self.Sy = self.Sy2 = self.Sx = self.Sx2= self.Sxy = self.categories = self.num_categories = self.cum_counts = None
 
     @classmethod
     def from_arguments(cls, yfile, xfile=None, dtype=float, xdtype=float, transpose=False,delim=","):
@@ -35,24 +35,38 @@ class Data(object):
     def calculate_x_cumulative_sum(self):
         if self.x is not None:
             self.Sx=np.cumsum(self.x)
+        else:
+            self.Sx=np.array([i*(i+1)/2 for i in range(self.n)])
+
+    def calculate_x_cumulative_sum_sq(self):
+        if self.x is not None:
+            self.Sx2=np.cumsum(self.x*self.x)
+        else:
+            self.Sx=np.array([i*(i+1)*(2*i+1) for i in range(self.n)])
 
     def calculate_xy_cumulative_sum(self):
         if self.x is not None:
-            self.Sxy=np.cumsum(np.multiply(self.x,self.y))
+            self.Sxy=np.cumsum(np.multiply(self.x,self.y),axis=1)
         else:
-            self.Sxy=np.cumsum(np.multiply(range(self.n),self.y))
+            self.Sxy=np.cumsum(np.multiply(range(self.n),self.y),axis=1)
 
     @staticmethod
-    def get_diff_between(mx,start,end,j=None):
+    def get_mx_diff_between(mx,start,end,j=None):
+        end_index=mx.shape[1]-1 if end is None else end
         if j is None:
-            return(mx[:,end-1]-(mx[:,start-1] if start>0 else 0))
+            return(mx[:,end_index-1]-(mx[:,start-1] if start>0 else 0))
         else:
-            return(mx[j,end-1]-(mx[j,start-1] if start>0 else 0))
+            return(mx[j,end_index-1]-(mx[j,start-1] if start>0 else 0))
+
+    @staticmethod
+    def get_diff_between(ar,start,end):
+        end_index=len(ar)-1 if end is None else end
+        return(ar[end_index-1]-(ar[start-1] if start>0 else 0))
 
     def get_y_sum_between(self,start,end,j=None):
         #return sum of y[start:end]
         if self.Sy is not None:
-            return(self.get_diff_between(self.Sy,start,end,j))
+            return(self.get_mx_diff_between(self.Sy,start,end,j))
         else:
             if j is None:
                 return(np.sum(self.y[:,start:end],axis=1))
@@ -69,7 +83,7 @@ class Data(object):
     def get_y_sum_squares_between(self,start,end,j=None):
         #return sum of squares of y[start:end]
         if self.Sy2 is not None:
-            return(self.get_diff_between(self.Sy2,start,end,j))
+            return(self.get_mx_diff_between(self.Sy2,start,end,j))
         else:
             if j is None:
                 return(np.sum(self.y[:,start:end]**2,axis=1))
@@ -79,22 +93,40 @@ class Data(object):
     def get_x_sum_between(self,start,end):
         #return sum of x[start:end]
         if self.Sx is not None:
-            return(self.get_diff_between(self.Sx,start,end,j))
+            return(self.get_diff_between(self.Sx,start,end))
         else:
             if self.x is None:
                 return(end-start)
             else:
                 return(np.sum(self.x[start:end],axis=1))
 
-    def get_xy_sum_between(self,start,end):
-        #return sum of x[start:end]*y[start:end]
-        if self.Sxy is not None:
-            return(self.get_diff_between(self.Sxy,start,end,j))
+    def get_x_sum_squares_between(self,start,end):
+        #return sum of squares of x[start:end]
+        if self.Sx2 is not None:
+            return(self.get_diff_between(self.Sx2,start,end))
         else:
             if self.x is None:
-                return(np.sum(np.multiply(range(start,end),self.y[start:end])))
+                if start<=1:
+                    return(end*(end-1)*(2*end-1)/6.0)
+                return((end*(end-1)*(2*end-1)-start*(start-1)*(2*start-1))/6.0)
             else:
-                return(np.sum(np.multiply(x[start:end],self.y[start:end])))
+                return(np.sum(self.x[start:end]**2))
+
+    def get_xy_sum_between(self,start,end,j=None):
+        #return sum of x[start:end]*y[start:end]
+        if self.Sxy is not None:
+            return(self.get_mx_diff_between(self.Sxy,start,end,j))
+        else:
+            if self.x is None:
+                if j is None:
+                    return(np.sum(np.multiply(range(start,end),self.y[:,start:end])))
+                else:
+                    return(np.sum(np.multiply(range(start,end),self.y[j,start:end])))
+            else:
+                if j is None:
+                    return(np.sum(np.multiply(x[start:end],self.y[:,start:end])))
+                else:
+                    return(np.sum(np.multiply(x[start:end],self.y[j,start:end])))
 
     def get_combined_y_sums(self,dim=0,start_end=[(0,None)]):
         return(np.sum([self.get_y_sum_between(start,end,dim) for start,end in start_end],axis=0))
@@ -108,8 +140,11 @@ class Data(object):
     def get_combined_x_sums(self,start_end=[(0,None)]):
         return(np.sum([self.get_x_sum_between(start,end) for start,end in start_end],axis=0))
 
-    def get_combined_xy_sums(self,start_end=[(0,None)]):
-        return(np.sum([self.get_xy_sum_between(start,end) for start,end in start_end],axis=0))
+    def get_combined_x_sum_squares(self,start_end=[(0,None)]):
+        return(np.sum([self.get_x_sum_squares_between(start,end) for start,end in start_end],axis=0))
+
+    def get_combined_xy_sums(self,dim=0,start_end=[(0,None)]):
+        return(np.sum([self.get_xy_sum_between(start,end,dim) for start,end in start_end],axis=0))
 
     def calculate_unique_categories(self):
         self.categories=[{} for j in range(self.p)]
