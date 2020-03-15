@@ -52,34 +52,3 @@ class NormalLinearModel(ProbabilityModel):
         b_n=self.b0+.5*(y2-(x*m_n[0]+xy*m_n[1])) #Posterior gamma shape parameter of sigma
         lhd=self.density_constant+.5*log_det_V_n-a_n*np.log(b_n)+gammaln(a_n)
         return(lhd)
-
-####
-def get_linear_model_lhd(y,ydot,yty,a,b,lam,yn1=None):
-    global m_n
-#    if len(y)==1: #or np.isscalar(y)
-#        k=1
-    k=len(y)
-    lam1,lam2=.0001*lam,lam
-    Dty=np.array([ydot,np.dot(y,range(k))])
-    V_n=np.array([[k+lam1,k*(k-1)/2],[k*(k-1)/2,k*(k-1)*(2*k-1)/6+lam2]])#np.dot(D.T,D)+lam*np.eye(D.shape[1])
-    det_V_n=(k+lam1)*(k*(k-1)*(2*k-1)/6+lam2)-(k*(k-1))**2/4.0
-    ldet_V_n=np.log(det_V_n)# np.linalg.slogdet(V_n)[1]
-    V_inv_n=np.array([[k*(k-1)*(2*k-1)/6+lam2,-k*(k-1)/2],[-k*(k-1)/2,k+lam1]])/det_V_n #np.linalg.inv(V_n)
-    m_n=np.dot(V_inv_n,Dty.T)
-    a_n=a+k
-    b_n=b+.5*(yty-np.dot(m_n.T,Dty.T))
-    llam=.5*(np.log(lam1*lam2))
-    if yn1 is None:
-        a0lb0=a*np.log(b)
-        lgama0=gammaln(a)
-#        lhd=a0lb0-a_n*np.log(b_n)+llam-.5*ldet_V_n+lgama0-gammaln(a+k)
-        lhd=a0lb0-a_n*np.log(b_n)+llam-.5*ldet_V_n-lgama0+gammaln(a+k)
-    else:
-        V_n1=np.array([[k+1+lam1,k*(k+1)/2],[k*(k+1)/2,k*(k+1)*(2*k+1)/6+lam2]]) #V_n+np.array([[1,k],[k,k**2]])
-        det_V_n1=(k+1+lam1)*(k*(k+1)*(2*k+1)/6+lam2)-(k*(k+1))**2/4.0
-        ldet_V_n1=np.log(det_V_n1) #np.linalg.slogdet(V_n1)[1]
-        V_inv_n1=np.array([[k*(k+1)*(2*k+1)/6+lam2,-k*(k+1)/2],[-k*(k+1)/2,k+1+lam1]])/det_V_n1 #np.linalg.inv(V_n1)
-        m_n1=np.dot(V_inv_n1,(Dty+[yn1,yn1*k]).T)
-        b_n1=b+.5*(yty+yn1**2-np.dot(m_n1.T,(Dty+[yn1,yn1*k]).T))
-        lhd=-np.log(a+k)+a_n*np.log(b_n)+.5*ldet_V_n  -(a_n+1)*np.log(b_n1)-.5*ldet_V_n1#+llam
-    return lhd
