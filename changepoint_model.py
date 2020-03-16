@@ -162,17 +162,17 @@ class ChangepointModel(object):
         self.num_cps=len(tau)
         self.cps=np.sort(np.array([self.baseline_changepoint]+[Changepoint(t) for t in tau],dtype=Changepoint))
         if regime_numbers is None:
-            regime_numbers=range(self.num_cps+1)
+            regime_numbers=list(range(self.num_cps+1))
         else:
             regime_numbers=[0]+list(regime_numbers)
         self.zeroth_regime.cp_indices=np.where(regime_numbers==0)
         self.regimes=[self.zeroth_regime]
         self.num_regimes=max(regime_numbers)+1
         for rn in range(1,self.num_regimes):
-            rn_indices=np.where(regime_numbers==rn)
+            rn_indices=[i for i in range(len(regime_numbers)) if regime_numbers[i]==rn]
             regime_rn=Regime([self.cps[cp_i] for cp_i in rn_indices])
             self.regimes+=[regime_rn]
-            for cp in regime_rn:
+            for cp in regime_rn.cps:
                 self.regime_of_changepoint[cp]=regime_rn
 
     def find_position_in_changepoints(self,t=None,cp=None):
@@ -267,8 +267,8 @@ class ChangepointModel(object):
             if r.model_is_active(pm_i):
                 start_end=[self.get_changepoint_segment_start_end(pm_i,cp) for cp in r.cps]
                 r.set_model_lhd(pm_i,self.probability_models[pm_i].likelihood(start_end))
-        self.likelihood=sum([r.get_total_lhd() for r in self.regimes])
-        return(self.likelihood)
+        self.lhd=sum([r.get_total_lhd() for r in self.regimes])
+        return(self.lhd)
 
     def get_effective_changepoint_locations(self):
         regime=self.zeroth_regime
@@ -305,12 +305,13 @@ class ChangepointModel(object):
     def calculate_posterior(self,regime_model_pairs=None):
         self.calculate_prior()
         self.calculate_likelihood(regime_model_pairs=regime_model_pairs)
-        self.posterior=self.prior+self.likelihood
+        self.posterior=self.prior+self.lhd
         return(self.posterior)
 
-    def mcmc(self,iterations=20,burnin=0,seed=None):
+    def mcmc(self,iterations=20,burnin=0,seed=None,hill_climbing=False):
         if seed is not None:
             np.random.seed(seed)
+        self.hill_climbing=hill_climbing
         for self.iteration in range(-burnin,iterations):
             self.mcmc_refresh()
             self.propose_move()
@@ -376,6 +377,8 @@ class ChangepointModel(object):
         self.accpeptance_ratio=self.proposal_ratio+self.posterior-self.stored_posterior
         if self.accpeptance_ratio<0 and np.random.exponential()<-self.accpeptance_ratio:
             self.mh_accept=False
+        if self.hill_climbing:
+            self.mh_accept=self.posterior>=self.stored_posterior
         if self.mh_accept:
             self.proposal_acceptance_counts[self.move_type]+=1
 #        else:

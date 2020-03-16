@@ -1,22 +1,34 @@
 import numpy as np
+from collections import defaultdict,Counter
 #from bisect import bisect
 
 class Data(object):
     #y is a (pxn) matrix of data 'observations'
     #x is an n-vector of time points (or some other univariate covariate)
-    def __init__(self, y=[], x=None, transpose=False):
-        self.y=np.atleast_2d(y)
+    def __init__(self, y=[], x=None, cts=None, transpose=False):
+        self.Sy = self.Sy2 = self.Sx = self.Sx2= self.Sxy = self.categories = self.num_categories = self.cum_counts = None
+        if y is not None:
+            self.y=np.atleast_2d(y)
+            self.p, self.n=self.y.shape
+        else:
+            self.y=np.atleast_2d(cts)
+            self.cum_counts=np.array([np.cumsum(self.y,axis=1)])
+            self.num_categories=[self.cum_counts.shape[1]]
+            self.p=1
+            self.n=self.y.shape[1]
         if transpose:
             self.y=self.y.transpose()
         self.x=None if x is None else np.array(x)
-        self.p, self.n=self.y.shape
-        self.Sy = self.Sy2 = self.Sx = self.Sx2= self.Sxy = self.categories = self.num_categories = self.cum_counts = None
 
     @classmethod
-    def from_arguments(cls, yfile, xfile=None, dtype=float, xdtype=float, transpose=False,delim=","):
-        y=np.loadtxt(yfile,dtype=dtype,delimiter=delim)
+    def from_arguments(cls, yfile, xfile=None, dtype=float, xdtype=float, transpose=False,delim=",",y_textfile=False):
+        y=cts=None
+        if not y_textfile:
+            y=np.loadtxt(yfile,dtype=dtype,delimiter=delim)
+        else:
+            cts=word_counts_from_file(yfile)[0]#,delim=delim)
         x=None if xfile is None else np.loadtxt(xfile,dtype=xdtype,delimiter=delim)
-        return(cls(y,x,transpose))
+        return(cls(y,x,cts,transpose))
 
     def find_position(self,t):
         if t==-float("inf"):
@@ -154,6 +166,8 @@ class Data(object):
             self.num_categories[j]=len(self.categories[j])
 
     def calculate_y_cumulative_counts(self,num_categories=None):
+        if self.cum_counts is not None:
+            return()
         if num_categories is None:
             self.calculate_unique_categories()
             num_categories=self.num_categories
@@ -168,7 +182,7 @@ class Data(object):
 
     def get_y_cumulative_counts(self,dim=0,start=0,end=None):
         start_cts=np.zeros(self.num_categories[dim],dtype=int) if start==0 else self.cum_counts[dim][:,(start-1)]
-        end_cts=self.cum_counts[dim][:,self.n-1] if (end is None or end>=self.n) else self.cum_counts[dim][:,end]
+        end_cts=self.cum_counts[dim][:,self.n-1] if (end is None or end>=self.n) else self.cum_counts[dim][:,end-1]
         return(end_cts-start_cts)
 
     def get_combined_y_cumulative_counts(self,dim=0,start_end=[(0,None)]):
@@ -176,3 +190,29 @@ class Data(object):
 
     def get_x_max(self):
         return(self.n-1 if self.x is None else max(self.x))
+
+def word_counts_from_file(file,delim=" "):
+    import string
+    word_counts=defaultdict(Counter)
+    total_word_counts=Counter()
+    with open(file,"r") as f:
+        line_count=0
+        for line in f:
+            word_counts[line_count]=Counter(line.strip().translate(str.maketrans('', '', string.punctuation)).lower().split(delim))
+            total_word_counts+=word_counts[line_count]
+            line_count+=1
+
+    n=line_count
+    word_map={}
+    ctr=0
+    V=len(total_word_counts)
+    for w,c in total_word_counts.most_common():
+        word_map[w]=ctr
+        ctr+=1
+
+    y_counts=np.zeros((V,n),dtype=int)
+    for line_count in range(n):
+        for w in word_counts[line_count]:
+            y_counts[word_map[w],line_count]=word_counts[line_count][w]
+
+    return(y_counts,word_map)

@@ -9,10 +9,11 @@ from changepoint_model import ChangepointModel
 import numpy as np
 
 dat=Data.from_arguments('y_0.txt','x_0.txt',dtype=int,xdtype=float)
-md=MultinomialDirichlet(dat,alpha=.01)
+dat_txt=Data.from_arguments('text.txt',y_textfile=True)
+md=MultinomialDirichlet(dat_txt,alpha=.01)
 pg=PoissonGamma(dat,alpha_beta=[.01,.01])
 nig=NormalNIG(dat,alpha_beta=[.01,.01],v=1)
-nlm=NormalLinearModel(dat,alpha_beta=[.01,.01],v=1)
+nlm=NormalLinearModel(dat,alpha_beta=[1,10.0],v=1)
 up=UniformPareto(dat,alpha_beta=[.01,4])
 tau=np.loadtxt('tau.txt')
 #print(md.changepoint_likelihood(tau=tau))
@@ -51,7 +52,7 @@ if not do_mcmc:
         print(cpm.posterior)
         print(cpm.calculate_posterior())
 else:
-    cpm.mcmc(10000,seed=10)
+    cpm.mcmc(10000,seed=10,hill_climbing=True)
     print(cpm.get_effective_changepoint_locations())
 
 #print(cpm.find_position_in_changepoints(.3))

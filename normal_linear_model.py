@@ -6,7 +6,7 @@ from scipy.special import gammaln
 LOG_PI=np.log(np.pi)
 
 class NormalLinearModel(ProbabilityModel):
-    def __init__(self,data=None,alpha_beta=(.1,.1),v=1,p=1):
+    def __init__(self,data=None,alpha_beta=(.1,1.0),v=1,p=1):
         ProbabilityModel.__init__(self,data,alpha_beta) #y_i~N(mu,sigma**2)
         self.a0,self.b0=alpha_beta #sigma**(-2)~Gamma(a0,b0)
         self.v1=self.v2=v #a multiplier for the standard deviation of mu, mu~N(0,(sigma*v)**2)
@@ -33,13 +33,17 @@ class NormalLinearModel(ProbabilityModel):
 
     def sample_parameter(self):
         sigma=1.0/np.sqrt(np.random.gamma(self.a0,1.0/self.b0,size=self.p))
-        mu=np.random.normal(scale=sigma*self.v,size=self.p)
+        mu=np.random.multivariate_normal(mean=np.zeros(2),cov=np.diag([self.v1,self.v2]),size=self.p)*sigma
         return(mu,sigma)
 
-    def simulate_data(self,n,mu=None,sigma=None):
+    def simulate_data(self,n,mu=None,sigma=None,x=None):
         if mu is None or sigma is None:
             mu,sigma=self.sample_parameter()
-        return([np.random.normal(mu[i],sigma[i],size=n) for i in range(self.p)])
+            print(sigma)
+        if x is None:
+            x=np.array(range(n))
+        mean=[mu[i][0]+mu[i][1]*x for i in range(self.p)]
+        return([mean[i]+np.random.normal(0,sigma[i],size=n) for i in range(self.p)])
 
     def log_density(self,y,y2,x,x2,xy,n=1):
         #V_n^{-1}=XtX+V^{-1}=[[n+self.v_inv1,x][x,x2+self.v_inv2]]

@@ -9,7 +9,8 @@ class MultinomialDirichlet(ProbabilityModel):
         if k is not None:
             self.k=k if hasattr(k, "__len__") else np.repeat(k,data.p)
         else:
-            self.data.calculate_unique_categories()
+            if self.data.num_categories is None:
+                self.data.calculate_unique_categories()
             self.k=self.data.num_categories
 
         self.alphas=alpha if hasattr(alpha, "__len__") else np.array([np.repeat(alpha,self.k[j]) for j in range(len(self.k))])
