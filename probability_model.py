@@ -34,7 +34,7 @@ class ProbabilityModel(ABC):
         pass
 
     @abstractmethod
-    def simulate_data(self,n):
+    def simulate_data(self,n,thetas=None,x=None):
         pass
 
     def find_data_position(self,t):

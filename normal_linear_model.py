@@ -33,7 +33,7 @@ class NormalLinearModel(ProbabilityModel):
 
     def sample_parameter(self):
         sigma=1.0/np.sqrt(np.random.gamma(self.a0,1.0/self.b0,size=self.p))
-        mu=np.random.multivariate_normal(mean=np.zeros(2),cov=np.diag([self.v1,self.v2]),size=self.p)*sigma
+        mu=np.multiply(np.atleast_2d(sigma).transpose(),np.random.multivariate_normal(mean=np.zeros(2),cov=np.diag([self.v1,self.v2]),size=self.p))
         return(mu,sigma)
 
     def simulate_data(self,n,thetas=None,x=None):

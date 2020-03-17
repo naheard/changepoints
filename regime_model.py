@@ -25,7 +25,7 @@ class RegimeModel(ProbabilityModel):
                 num_regimes+=1
         return(regimes)
 
-    def simulate_data(self,n):
+    def simulate_data(self,n,thetas=None,x=None):
         return(sample_parameter())
 
     def log_density(self,y):

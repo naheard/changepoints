@@ -29,7 +29,7 @@ class MultinomialDirichlet(ProbabilityModel):
     def sample_parameter(self):
         return([np.random.dirichlet(a) for a in self.alphas])
 
-    def simulate_data(self,n,thetas=None):
+    def simulate_data(self,n,thetas=None,x=None):
         if thetas is None:
             thetas=self.sample_parameter()
         return([np.random.choice(int(len(theta)),int(n),p=theta) for theta in thetas])

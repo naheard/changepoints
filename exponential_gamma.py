@@ -19,7 +19,7 @@ class ExponentialGamma(ProbabilityModel):
     def sample_parameter(self):
         return(np.random.gamma(self.a0,self.b0,size=self.p))
 
-    def simulate_data(self,n,thetas=None):
+    def simulate_data(self,n,thetas=None,x=None):
         if thetas is None:
             thetas=self.sample_parameter()
         return([np.random.poisson(theta,size=n) for theta in thetas])

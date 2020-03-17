@@ -52,7 +52,7 @@ def simulate_changepoint_data(n,inclusion_vector=[1],tau=[],regimes=[0],num_cate
         if r_i in theta_map:
             thetas=theta_map[r_i]
         if end>start: #else segment empty
-            y[:,start:end]=model.simulate_data(end-start,thetas)
+            y[:,start:end]=model.simulate_data(end-start,thetas,x=range(start,end))
             start=end
 
     if y_filename!=None:
@@ -62,7 +62,7 @@ def simulate_changepoint_data(n,inclusion_vector=[1],tau=[],regimes=[0],num_cate
     return(x,y)
 
 def simulate(n,probability_models,lambda_cps=0.01,seed=None):
-    cps,regimes,inclusion_vectors=simulate_changepoints_and_regimes(n=n,n_prob_models=len(probability_models),inclusion_ps=.8,seed=seed,tau_filename="tau.txt")
+    cps,regimes,inclusion_vectors=simulate_changepoints_and_regimes(n=n,lambda_cps=lambda_cps,n_prob_models=len(probability_models),inclusion_ps=.8,seed=seed,tau_filename="tau.txt")
     theta_maps=simulate_parameters(inclusion_vectors,probability_models)
     xys=[]
     for i in range(len(probability_models)):

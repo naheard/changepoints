@@ -18,7 +18,7 @@ class UniformPareto(ProbabilityModel):
     def sample_parameter(self):
         return((np.random.pareto(self.a0,size=self.p)+1)*self.b0)
 
-    def simulate_data(self,n,thetas=None):
+    def simulate_data(self,n,thetas=None,x=None):
         if thetas is None:
             thetas=self.sample_parameter()
         return([np.random.uniform(theta,size=n) for theta in thetas])

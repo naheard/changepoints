@@ -28,7 +28,7 @@ class NormalNIG(ProbabilityModel):
         mu=np.random.normal(scale=sigma*self.v,size=self.p)
         return(mu,sigma)
 
-    def simulate_data(self,n,thetas=None):
+    def simulate_data(self,n,thetas=None,x=None):
         if thetas is None:
             mu,sigma=self.sample_parameter()
         else:
