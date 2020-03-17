@@ -1,4 +1,5 @@
 #! /usr/bin/env python3
+import sys
 import numpy as np
 from data import Data
 from probability_model import ProbabilityModel
@@ -7,7 +8,6 @@ from regime_model import RegimeModel
 from multinomial_dirichlet import MultinomialDirichlet
 from normal_normal_inverse_gamma import NormalNIG
 from collections import defaultdict
-import sys
 
 def simulate_changepoints_and_regimes(n=1000,lambda_cps=.01,n_cps=None,n_prob_models=1,inclusion_ps=.8,seed=None,tau_filename=None):
     if seed is not None:
@@ -61,15 +61,18 @@ def simulate_changepoint_data(n,inclusion_vector=[1],tau=[],regimes=[0],num_cate
     if x_filename!=None:
         np.savetxt(x_filename,np.arange(n)/float(n-1),delimiter=",")
 
-def main():
-    n=1000 if len(sys.argv)<2 else int(sys.argv[1])
-    s=0 if len(sys.argv)<3 else int(sys.argv[2])
-    probability_models=[MultinomialDirichlet(k=np.array([3,5],dtype=int),alpha=1),NormalNIG(p=3,alpha_beta=[.1,.1],v=1)]#PoissonGamma(p=3,alpha_beta=[1,10])]
+def simulate(n,probability_models,seed=None):
     cps,regimes,inclusion_vectors=simulate_changepoints_and_regimes(n=n,n_cps=5,n_prob_models=len(probability_models),inclusion_ps=.8,seed=None,tau_filename="tau.txt")
     theta_maps=simulate_parameters(inclusion_vectors,probability_models)
     for i in range(len(probability_models)):
         pm=probability_models[i]
         file_ending="_"+str(i)+".txt"
-        simulate_changepoint_data(n=n,y_filename="y"+file_ending,x_filename="x"+file_ending,seed=s,tau=cps,regimes=regimes,model=pm,theta_map=theta_maps[pm])##"multinomial")#normal")
+        simulate_changepoint_data(n=n,y_filename="y"+file_ending,x_filename="x"+file_ending,seed=seed,tau=cps,regimes=regimes,model=pm,theta_map=theta_maps[pm])
 
-main()
+def main():
+    n=1000 if len(sys.argv)<2 else int(sys.argv[1])
+    s=0 if len(sys.argv)<3 else int(sys.argv[2])
+    probability_models=[MultinomialDirichlet(k=np.array([3,5],dtype=int),alpha=1),NormalNIG(p=3,alpha_beta=[.1,.1],v=1)]
+    simulate(n,probability_models,s)
+
+#main()
