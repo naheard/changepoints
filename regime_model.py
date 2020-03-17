@@ -9,6 +9,7 @@ class RegimeModel(ProbabilityModel):
         ProbabilityModel.__init__(self)
         self.disallow_successive_regimes=disallow_successive_regimes
         self.spike_regimes=spike_regimes
+        self.data_type=int
 
     def likelihood_component(self,j=0,start_end=[(0,None)],y=None):
         if y is not None:

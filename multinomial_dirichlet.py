@@ -17,6 +17,10 @@ class MultinomialDirichlet(ProbabilityModel):
         self.alpha_dots=np.array([sum(a) for a in self.alphas])
         if self.data is not None:
             self.data.calculate_y_cumulative_counts(self.k)
+        self.data_type=int
+
+    def get_dimension(self):
+        return(len(self.alphas))
 
     def likelihood_component(self,j=0,start_end=[(0,None)],y=None):
         counts=y if y is not None else self.data.get_combined_y_cumulative_counts(j,start_end)

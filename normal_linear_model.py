@@ -36,10 +36,12 @@ class NormalLinearModel(ProbabilityModel):
         mu=np.random.multivariate_normal(mean=np.zeros(2),cov=np.diag([self.v1,self.v2]),size=self.p)*sigma
         return(mu,sigma)
 
-    def simulate_data(self,n,mu=None,sigma=None,x=None):
-        if mu is None or sigma is None:
+    def simulate_data(self,n,thetas=None,x=None):
+        if thetas is None:
             mu,sigma=self.sample_parameter()
             print(sigma)
+        else:
+            mu,sigma=thetas[0],thetas[1]
         if x is None:
             x=np.array(range(n))
         mean=[mu[i][0]+mu[i][1]*x for i in range(self.p)]

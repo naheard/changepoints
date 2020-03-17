@@ -7,7 +7,6 @@ class ExponentialGamma(ProbabilityModel):
     def __init__(self,data=None,alpha_beta=(.1,.1),p=1):
         ProbabilityModel.__init__(self,data,alpha_beta)
         self.a0,self.b0=alpha_beta
-        self.p=p if self.data is None else self.data.p
         self.density_constant=-gammaln(self.a0)+self.a0*np.log(self.b0)
         if self.data is not None:
             self.data.calculate_y_cumulative_sum()

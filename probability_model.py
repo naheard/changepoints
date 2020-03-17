@@ -6,6 +6,8 @@ class ProbabilityModel(ABC):
 
     def __init__(self,data=None,parameters=None):
         self.data=data
+        self.data_type=float if self.data is None else self.data.dtype
+        self.p=1 if self.data is None else self.data.p
         self.parameters=parameters
 
     def likelihood(self,start_end=[(0,None)],y=None):
@@ -19,6 +21,9 @@ class ProbabilityModel(ABC):
             lhd=self.likelihood_component(0,y=y)
 
         return(lhd)
+
+    def get_dimension(self):
+        return(self.p)
 
     @abstractmethod
     def likelihood_component(self,j=0,start_end=[(0,None)],y=None):
