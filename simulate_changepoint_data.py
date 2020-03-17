@@ -43,6 +43,7 @@ def simulate_changepoint_data(n,inclusion_vector=[1],tau=[],regimes=[0],num_cate
     n_cps=len(tau)
     tau_positions=np.ceil(tau*(n-1)).astype(int)
     p=model.get_dimension()
+    x=np.arange(n)/float(n-1)
     y=np.empty((p,n),dtype=model.data_type)
     start=0
     for i in range(n_cps+1):
@@ -51,23 +52,25 @@ def simulate_changepoint_data(n,inclusion_vector=[1],tau=[],regimes=[0],num_cate
         if r_i in theta_map:
             thetas=theta_map[r_i]
         if end>start: #else segment empty
-#            print(start,end,model.simulate_data(end-start,thetas))
-#            print('**',y[:,start:end])
             y[:,start:end]=model.simulate_data(end-start,thetas)
             start=end
 
     if y_filename!=None:
         np.savetxt(y_filename,y,fmt='%i' if model!="normal" else '%.18e',delimiter=",")
     if x_filename!=None:
-        np.savetxt(x_filename,np.arange(n)/float(n-1),delimiter=",")
+        np.savetxt(x_filename,x,delimiter=",")
+    return(x,y)
 
-def simulate(n,probability_models,seed=None):
-    cps,regimes,inclusion_vectors=simulate_changepoints_and_regimes(n=n,n_cps=5,n_prob_models=len(probability_models),inclusion_ps=.8,seed=None,tau_filename="tau.txt")
+def simulate(n,probability_models,lambda_cps=0.01,seed=None):
+    cps,regimes,inclusion_vectors=simulate_changepoints_and_regimes(n=n,n_prob_models=len(probability_models),inclusion_ps=.8,seed=seed,tau_filename="tau.txt")
     theta_maps=simulate_parameters(inclusion_vectors,probability_models)
+    xys=[]
     for i in range(len(probability_models)):
         pm=probability_models[i]
         file_ending="_"+str(i)+".txt"
-        simulate_changepoint_data(n=n,y_filename="y"+file_ending,x_filename="x"+file_ending,seed=seed,tau=cps,regimes=regimes,model=pm,theta_map=theta_maps[pm])
+        xys.append(simulate_changepoint_data(n=n,y_filename="y"+file_ending,x_filename="x"+file_ending,seed=seed,tau=cps,regimes=regimes,model=pm,theta_map=theta_maps[pm]))
+
+    return(cps,regimes,inclusion_vectors,xys)
 
 def main():
     n=1000 if len(sys.argv)<2 else int(sys.argv[1])

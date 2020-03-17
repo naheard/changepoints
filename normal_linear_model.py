@@ -39,7 +39,6 @@ class NormalLinearModel(ProbabilityModel):
     def simulate_data(self,n,thetas=None,x=None):
         if thetas is None:
             mu,sigma=self.sample_parameter()
-            print(sigma)
         else:
             mu,sigma=thetas[0],thetas[1]
         if x is None:

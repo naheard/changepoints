@@ -28,9 +28,11 @@ class NormalNIG(ProbabilityModel):
         mu=np.random.normal(scale=sigma*self.v,size=self.p)
         return(mu,sigma)
 
-    def simulate_data(self,n,mu=None,sigma=None):
-        if mu is None or sigma is None:
+    def simulate_data(self,n,thetas=None):
+        if thetas is None:
             mu,sigma=self.sample_parameter()
+        else:
+            mu,sigma=thetas[0],thetas[1]
         return([np.random.normal(mu[i],sigma[i],size=n) for i in range(self.p)])
 
     def log_density(self,y,y2,n=1):
