@@ -6,18 +6,25 @@ from scipy.special import gammaln
 class MultinomialDirichlet(ProbabilityModel):
     def __init__(self,data=None,k=None,alpha=.1):
         ProbabilityModel.__init__(self,data,alpha)
+        self.k=None
         if k is not None:
             self.k=k if hasattr(k, "__len__") else np.repeat(k,data.p)
         else:
             if self.data.num_categories is None:
                 self.data.calculate_unique_categories()
+#            self.k=self.data.num_categories
+        self.calculate_data_summaries()
+        if self.k is None:
             self.k=self.data.num_categories
-
         self.alphas=alpha if hasattr(alpha, "__len__") else np.array([np.repeat(alpha,self.k[j]) for j in range(len(self.k))])
         self.alpha_dots=np.array([sum(a) for a in self.alphas])
+        self.data_type=int
+
+    def calculate_data_summaries(self):
         if self.data is not None:
             self.data.calculate_y_cumulative_counts(self.k)
-        self.data_type=int
+            if self.data.num_categories is None:
+                self.data.calculate_unique_categories()
 
     def get_dimension(self):
         return(len(self.alphas))

@@ -8,6 +8,9 @@ class ExponentialGamma(ProbabilityModel):
         ProbabilityModel.__init__(self,data,alpha_beta)
         self.a0,self.b0=alpha_beta
         self.density_constant=-gammaln(self.a0)+self.a0*np.log(self.b0)
+        self.calculate_data_summaries()
+
+    def calculate_data_summaries(self):
         if self.data is not None:
             self.data.calculate_y_cumulative_sum()
 

@@ -1,6 +1,7 @@
 #! /usr/bin/env python3
 import sys
 import numpy as np
+import matplotlib.pyplot as plt
 from data import Data
 from probability_model import ProbabilityModel
 from poisson_gamma import PoissonGamma
@@ -24,7 +25,7 @@ def simulate_changepoints_and_regimes(n=1000,lambda_cps=.01,n_cps=None,n_prob_mo
         while sum(inclusion_vectors[:,j])==0:
             inclusion_vectors[:,j]=[np.random.binomial(1,inclusion_ps[i]) for i in range(n_prob_models)]
 
-    if tau_filename!=None:
+    if tau_filename is not None:
         np.savetxt(tau_filename,tau,delimiter=",",fmt='%1.3f',newline=" ")
     return(tau,regimes,inclusion_vectors)
 
@@ -59,7 +60,7 @@ def simulate_changepoint_data(n,inclusion_vector=[1],tau=[],regimes=[0],num_cate
         np.savetxt(y_filename,y,fmt='%i' if model!="normal" else '%.18e',delimiter=",")
     if x_filename!=None:
         np.savetxt(x_filename,x,delimiter=",")
-    return(x,y)
+    return(Data(y,x))#x,y)
 
 def simulate(n,probability_models,lambda_cps=0.01,seed=None):
     cps,regimes,inclusion_vectors=simulate_changepoints_and_regimes(n=n,lambda_cps=lambda_cps,n_prob_models=len(probability_models),inclusion_ps=.8,seed=seed,tau_filename="tau.txt")
@@ -71,6 +72,28 @@ def simulate(n,probability_models,lambda_cps=0.01,seed=None):
         xys.append(simulate_changepoint_data(n=n,y_filename="y"+file_ending,x_filename="x"+file_ending,seed=seed,tau=cps,regimes=regimes,model=pm,theta_map=theta_maps[pm]))
 
     return(cps,regimes,inclusion_vectors,xys)
+
+def plot_data(cps,regimes,inclusion_vectors,xys,estimated_cps=None,estimated_regimes=None,plot_dim=0):
+    n_models=len(xys)
+    plt.figure(figsize=(12,4*n_models))
+    for index in range(n_models):
+        plt.subplot(n_models,1,index+1)
+        plt.autoscale(enable=True, axis='x', tight=True)
+        x,y=xys[index].x,xys[index].y
+        r=regimes[0]
+        for i in range(len(cps)):
+            new_r=regimes[i+1]
+            if inclusion_vectors[index,new_r] and new_r!=r:
+                plt.axvline(x=cps[i],linewidth=.8,color='red')
+                r=new_r
+            else:
+                plt.axvline(x=cps[i],linewidth=.8,color='pink')
+
+        if estimated_cps is not None:
+            for i in range(len(estimated_cps)):
+                plt.axvline(x=estimated_cps[i],linestyle='dashed',color='green')
+        plt.scatter(x,y[plot_dim,],marker="x",s=1.5)
+    plt.show()
 
 def main():
     n=1000 if len(sys.argv)<2 else int(sys.argv[1])

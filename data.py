@@ -64,7 +64,7 @@ class Data(object):
 
     @staticmethod
     def get_mx_diff_between(mx,start,end,j=None):
-        end_index=mx.shape[1]-1 if end is None else end
+        end_index=mx.shape[1] if end is None else end
         if j is None:
             return(mx[:,end_index-1]-(mx[:,start-1] if start>0 else 0))
         else:
@@ -72,7 +72,7 @@ class Data(object):
 
     @staticmethod
     def get_diff_between(ar,start,end):
-        end_index=len(ar)-1 if end is None else end
+        end_index=len(ar) if end is None else end
         return(ar[end_index-1]-(ar[start-1] if start>0 else 0))
 
     def get_y_sum_between(self,start,end,j=None):
@@ -100,7 +100,7 @@ class Data(object):
             if j is None:
                 return(np.sum(self.y[:,start:end]**2,axis=1))
             else:
-                return(np.sum(self.y[j,start:end]**2,axis=1))
+                return(np.sum(self.y[j,start:end]**2))
 
     def get_x_sum_between(self,start,end):
         #return sum of x[start:end]
@@ -110,7 +110,7 @@ class Data(object):
             if self.x is None:
                 return(end-start)
             else:
-                return(np.sum(self.x[start:end],axis=1))
+                return(np.sum(self.x[start:end]))
 
     def get_x_sum_squares_between(self,start,end):
         #return sum of squares of x[start:end]
@@ -136,9 +136,9 @@ class Data(object):
                     return(np.sum(np.multiply(range(start,end),self.y[j,start:end])))
             else:
                 if j is None:
-                    return(np.sum(np.multiply(x[start:end],self.y[:,start:end])))
+                    return(np.sum(np.multiply(self.x[start:end],self.y[:,start:end])))
                 else:
-                    return(np.sum(np.multiply(x[start:end],self.y[j,start:end])))
+                    return(np.sum(np.multiply(self.x[start:end],self.y[j,start:end])))
 
     def get_combined_y_sums(self,dim=0,start_end=[(0,None)]):
         return(np.sum([self.get_y_sum_between(start,end,dim) for start,end in start_end],axis=0))
@@ -171,6 +171,8 @@ class Data(object):
         if num_categories is None:
             self.calculate_unique_categories()
             num_categories=self.num_categories
+        else:
+            self.num_categories=num_categories
 
         self.cum_counts = np.array([np.zeros((num_categories[j],self.n),dtype=int) for j in range(self.p)])
         for j in range(self.p):

@@ -271,15 +271,18 @@ class ChangepointModel(object):
         return(self.lhd)
 
     def get_effective_changepoint_locations(self):
+        self.get_regime_numbers()
         regime=self.zeroth_regime
         effective_cps=[]
+        effective_regime_numbers=[]
         for cp in self.cps:
             regime_cp=self.regime_of_changepoint[cp]
             if regime_cp!=regime and regime_cp.is_active():
                 regime=regime_cp
                 effective_cps+=[cp.tau]
+                effective_regime_numbers+=[self.regime_numbers[regime]]
 
-        return(effective_cps)
+        return(np.array(effective_cps),np.array(effective_regime_numbers))
 
     def get_regime_numbers(self):
         self.order_regimes()

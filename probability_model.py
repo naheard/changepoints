@@ -5,10 +5,20 @@ from data import Data
 class ProbabilityModel(ABC):
 
     def __init__(self,data=None,parameters=None):
-        self.data=data
-        self.data_type=float if self.data is None else self.data.dtype
-        self.p=1 if self.data is None else self.data.p
+        self.initialise_data(data)
         self.parameters=parameters
+
+    def initialise_data(self,data=None):
+        self.data=data
+        self.data_type=float if self.data is None else self.data.y.dtype
+        self.p=1 if self.data is None else self.data.p
+
+    def add_data(self,data):
+        self.data=data
+        self.calculate_data_summaries()
+
+    def calculate_data_summaries(self):
+        None
 
     def likelihood(self,start_end=[(0,None)],y=None):
         if len(start_end)==0:
