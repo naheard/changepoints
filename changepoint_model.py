@@ -282,13 +282,20 @@ class ChangepointModel(object):
                 effective_cps+=[cp.tau]
                 effective_regime_numbers+=[self.regime_numbers[regime]]
 
-        return(np.array(effective_cps),np.array(effective_regime_numbers))
+        return(np.array(effective_cps),np.array(effective_regime_numbers),self.get_inclusion_vectors_as_matrix())
 
     def get_regime_numbers(self):
         self.order_regimes()
         self.regime_numbers={}
         for r_i in range(self.num_regimes):
             self.regime_numbers[self.regimes[r_i]]=r_i
+
+    def get_inclusion_vectors_as_matrix(self):
+        inclusion_vectors_mx=np.zeros([self.num_probability_models,self.num_regimes],dtype=int)
+        for r_i in range(self.num_regimes):
+            inclusion_vectors_mx[:,self.regime_numbers[self.regimes[r_i]]]=self.regimes[r_i].inclusion_vector
+
+        return(inclusion_vectors_mx)
 
     def calculate_prior(self):
         self.prior=self.changepoint_prior.likelihood(y=self.num_cps)

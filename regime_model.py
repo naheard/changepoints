@@ -19,8 +19,17 @@ class RegimeModel(ProbabilityModel):
     def sample_parameter(self,n=1):
         regimes=np.zeros(n,dtype=int)
         num_regimes=1
+        blocked_regimes=[]
         for i in range(1,n):
-            regimes[i]=np.random.randint(num_regimes+1)
+            if self.disallow_successive_regimes:
+                blocked_regimes=[regimes[i-1]]
+            possible_regimes=[0,num_regimes] if self.spike_regimes else list(range(num_regimes+1))
+            allowed_regimes=[r for r in possible_regimes if r not in blocked_regimes]
+            num_allowed_regimes=len(allowed_regimes)
+            if num_allowed_regimes==1:
+                regimes[i]=allowed_regimes[0]
+            else:
+                regimes[i]=np.random.choice(allowed_regimes)
             if regimes[i]==num_regimes:
                 num_regimes+=1
         return(regimes)

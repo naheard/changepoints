@@ -73,7 +73,7 @@ def simulate(n,probability_models,lambda_cps=0.01,seed=None):
 
     return(cps,regimes,inclusion_vectors,xys)
 
-def plot_data(cps,regimes,inclusion_vectors,xys,estimated_cps=None,estimated_regimes=None,plot_dim=0):
+def plot_data(cps,regimes,inclusion_vectors,xys,estimated_cps=None,estimated_regimes=None,estimated_inclusion_vectors=None,plot_dim=0):
     n_models=len(xys)
     plt.figure(figsize=(12,4*n_models))
     for index in range(n_models):
@@ -91,7 +91,8 @@ def plot_data(cps,regimes,inclusion_vectors,xys,estimated_cps=None,estimated_reg
 
         if estimated_cps is not None:
             for i in range(len(estimated_cps)):
-                plt.axvline(x=estimated_cps[i],linestyle='dashed',color='green')
+                if estimated_inclusion_vectors[index,estimated_regimes[i]]:
+                    plt.axvline(x=estimated_cps[i],linestyle='dashed',color='green')
         plt.scatter(x,y[plot_dim,],marker="x",s=1.5)
     plt.show()
 
