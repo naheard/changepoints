@@ -1,3 +1,5 @@
+## regime_model.py
+
 from probability_model import ProbabilityModel
 from data import Data
 import numpy as np
@@ -61,7 +63,7 @@ class RegimeModel(ProbabilityModel):
         log_p_regimes=np.sum([-d_first_occurrences[i]*np.log((i+(1 if self.disallow_successive_regimes else 2))) for i in range(len(d_first_occurrences))])#assumes regime at each step is Uniform on available regimes
         return(log_p_regimes)
 
-    def propose_regime(self,num_regimes,left_regime=None,right_regime=None,current_regime=None,solo=False):
+    def propose_regime(self,num_regimes,left_regime=None,right_regime=None, current_regime=None,solo=False):
         blocked_regimes=[current_regime]
         if self.disallow_successive_regimes:
             for r in (left_regime,right_regime):

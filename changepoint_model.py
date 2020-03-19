@@ -1,3 +1,5 @@
+## changepoint_model.py
+
 from probability_model import ProbabilityModel
 from data import Data
 import numpy as np
@@ -33,7 +35,7 @@ class Regime(object):
     num_probability_models=0
     def __init__(self,cps,inclusion_vector=None,lhds=None):
         self.cps=cps
-        self.inclusion_vector=inclusion_vector if inclusion_vector is not None else np.ones(Regime.num_probability_models,dtype="bool")
+        self.inclusion_vector=np.array(inclusion_vector,dtype=bool) if inclusion_vector is not None else np.ones(Regime.num_probability_models,dtype=bool)
         self.lhds=lhds if lhds is not None else np.zeros(Regime.num_probability_models,dtype="float")
         self.stored_lhds=np.copy(self.lhds)
 
@@ -65,7 +67,7 @@ class Regime(object):
     def is_active(self):
         return(any(self.inclusion_vector) if self.inclusion_vector is not None else True)
 
-    def inclusion_vector_flip_position(self,pm_i):
+    def flip_inclusion(self,pm_i):
         self.inclusion_vector[pm_i]=not self.inclusion_vector[pm_i]
 
     def get_inclusion_counts(self):
@@ -93,7 +95,7 @@ class Regime(object):
         stream.write(delim.join(map(str,[cp.tau for cp in self.cps]))+"\n")
 
 class ChangepointModel(object):
-    def __init__(self,probability_models=np.array([],dtype=ProbabilityModel),infer_regimes=False,disallow_successive_regimes=True,spike_regimes=False):
+    def __init__(self,probability_models=np.array([],dtype=ProbabilityModel), infer_regimes=False,disallow_successive_regimes=True,spike_regimes=False):
         self.probability_models=probability_models
         self.num_probability_models=len(self.probability_models)
         Changepoint.probability_models=Regime.probability_models=self.probability_models
@@ -107,10 +109,10 @@ class ChangepointModel(object):
         self.changepoint_prior=PoissonGamma(alpha_beta=[.01,10])
         self.inclusion_prior=None if self.num_probability_models==1 else BernoulliBeta(alpha_beta=[.01,10])
         if self.infer_regimes:
-            self.regimes_model=RegimeModel(disallow_successive_regimes=disallow_successive_regimes,spike_regimes=spike_regimes)
+            self.regimes_model=RegimeModel(disallow_successive_regimes,spike_regimes)
         self.regime_of_changepoint={}
         self.baseline_changepoint=Changepoint(-float("inf"))
-        self.zeroth_regime=Regime([self.baseline_changepoint],np.ones(Regime.num_probability_models,dtype="bool"))
+        self.zeroth_regime=Regime([self.baseline_changepoint], [1]*self.num_probability_models)
         self.regimes=[self.zeroth_regime]
         self.regime_of_changepoint[self.baseline_changepoint]=self.zeroth_regime
         self.set_changepoints([])
@@ -125,17 +127,17 @@ class ChangepointModel(object):
 
     def create_mh_dictionary(self):
         self.proposal_functions={}
-        self.proposal_functions["shift_changepoint"]=self.propose_shift_changepoint
-        self.proposal_functions["delete_changepoint"]=self.propose_delete_changepoint
-        self.proposal_functions["add_changepoint"]=self.propose_add_changepoint
-        self.proposal_functions["change_regime"]=self.propose_change_regime_of_changepoint
-        self.proposal_functions["change_regime_inclusion"]=self.propose_change_regime_inclusion_vector
+        self.proposal_functions["shift_changepoint"]= self.propose_shift_changepoint
+        self.proposal_functions["delete_changepoint"]= self.propose_delete_changepoint
+        self.proposal_functions["add_changepoint"]= self.propose_add_changepoint
+        self.proposal_functions["change_regime"]= self.propose_change_regime_of_changepoint
+        self.proposal_functions["change_regime_inclusion"]= self.propose_change_regime_inclusion_vector
         self.undo_proposal_functions={}
-        self.undo_proposal_functions["shift_changepoint"]=self.undo_shift_changepoint_proposal
-        self.undo_proposal_functions["delete_changepoint"]=self.undo_delete_changepoint_proposal
-        self.undo_proposal_functions["add_changepoint"]=self.undo_add_changepoint_proposal
-        self.undo_proposal_functions["change_regime"]=self.undo_change_regime_of_changepoint_proposal
-        self.undo_proposal_functions["change_regime_inclusion"]=self.undo_change_regime_inclusion_vector_proposal
+        self.undo_proposal_functions["shift_changepoint"]= self.undo_shift_changepoint_proposal
+        self.undo_proposal_functions["delete_changepoint"]= self.undo_delete_changepoint_proposal
+        self.undo_proposal_functions["add_changepoint"]= self.undo_add_changepoint_proposal
+        self.undo_proposal_functions["change_regime"]= self.undo_change_regime_of_changepoint_proposal
+        self.undo_proposal_functions["change_regime_inclusion"]= self.undo_change_regime_inclusion_vector_proposal
 
     def get_changepoint_segment_start_end(self,pm_index,cp):
         cp_index=list(self.cps).index(cp)
@@ -192,12 +194,12 @@ class ChangepointModel(object):
 
     def write_changepoints_and_regimes(self,stream=sys.stderr,delim="\t"):
         self.get_regime_numbers()
-        stream.write(delim.join([":".join(map(str,(cp.tau,self.regime_numbers[self.regime_of_changepoint[cp]]))) for cp in self.cps])+"\n")
+        stream.write(delim.join([":".join(map(str,(cp.tau, self.regime_numbers[self.regime_of_changepoint[cp]]))) for cp in self.cps])+"\n")
 
     def write_regime_inclusion_vectors(self,stream=sys.stderr,delim="\t"):
         self.order_regimes()
         try:
-            stream.write(delim.join([str(r_i)+":"+",".join(map(str,self.regimes[r_i].inclusion_vector)) for r_i in range(self.num_regimes)])+"\n")
+            stream.write(delim.join([str(r_i)+":"+",".join(map(str, self.regimes[r_i].inclusion_vector)) for r_i in range(self.num_regimes)])+"\n")
         except:
             None
 
@@ -262,7 +264,7 @@ class ChangepointModel(object):
         if self.inclusion_prior is not None:
             regime_model_pairs=None
         if regime_model_pairs is None:
-            regime_model_pairs=list(itertools.product(self.regimes,range(self.num_probability_models)))
+            regime_model_pairs=list(itertools.product(self.regimes, range(self.num_probability_models)))
         for r,pm_i in regime_model_pairs:
             if r.model_is_active(pm_i):
                 start_end=[self.get_changepoint_segment_start_end(pm_i,cp) for cp in r.cps]
@@ -282,7 +284,7 @@ class ChangepointModel(object):
                 effective_cps+=[cp.tau]
                 effective_regime_numbers+=[self.regime_numbers[regime]]
 
-        return(np.array(effective_cps),np.array(effective_regime_numbers),self.get_inclusion_vectors_as_matrix())
+        return(np.array(effective_cps), np.array(effective_regime_numbers), self.get_inclusion_vectors_as_matrix())
 
     def get_regime_numbers(self):
         self.order_regimes()
@@ -291,9 +293,9 @@ class ChangepointModel(object):
             self.regime_numbers[self.regimes[r_i]]=r_i
 
     def get_inclusion_vectors_as_matrix(self):
-        inclusion_vectors_mx=np.zeros([self.num_probability_models,self.num_regimes],dtype=int)
+        inclusion_vectors_mx=np.zeros([self.num_probability_models,self.num_regimes], dtype=int)
         for r_i in range(self.num_regimes):
-            inclusion_vectors_mx[:,self.regime_numbers[self.regimes[r_i]]]=self.regimes[r_i].inclusion_vector
+            inclusion_vectors_mx[:,self.regime_numbers[self.regimes[r_i]]] = self.regimes[r_i].inclusion_vector
 
         return(inclusion_vectors_mx)
 
@@ -302,7 +304,7 @@ class ChangepointModel(object):
         if self.num_cps>0 and min([self.distance_to_rh_cp(i) for i in range(self.num_cps+1)])<self.min_cp_spacing:
             self.prior=-float("inf")
         if self.infer_regimes:
-            self.regime_sequence,self.regime_sequence_inverse=create_numbering([self.regime_of_changepoint[self.cps[i]] for i in range(self.num_cps+1)])
+            self.regime_sequence,self.regime_sequence_inverse = create_numbering([self.regime_of_changepoint[self.cps[i]] for i in range(self.num_cps+1)])
             regime_prior=self.regimes_model.likelihood(y=self.regime_sequence)
             self.prior+=regime_prior
             if self.inclusion_prior is not None:
@@ -400,7 +402,7 @@ class ChangepointModel(object):
     def undo_lhd_changes(self):
         regime_model_pairs=self.affected_regime_model_pairs
         if regime_model_pairs is None:
-            regime_model_pairs=set(itertools.product(self.regimes,range(self.num_probability_models)))
+            regime_model_pairs=set(itertools.product(self.regimes, range(self.num_probability_models)))
         for r,pm_i in regime_model_pairs:
             r.revert_model_lhd(pm_i)
 
@@ -411,7 +413,8 @@ class ChangepointModel(object):
         for pm_i in range(self.num_probability_models):
             if affected_regime.model_is_active(pm_i):
                 self.affected_regime_model_pairs.add((affected_regime,pm_i))
-                left_regime=self.regime_of_changepoint[self.cps[self.get_active_cp_to_left(self.proposed_index,pm_i)]]
+                left_cp=self.get_active_cp_to_left(self.proposed_index,pm_i)
+                left_regime=self.regime_of_changepoint[self.cps[left_cp]]
                 self.affected_regime_model_pairs.add((left_regime,pm_i))
 
         left_boundary=self.cps[self.proposed_index-1].tau if self.proposed_index>1 else 0
@@ -425,7 +428,7 @@ class ChangepointModel(object):
 
     def undo_shift_changepoint_proposal(self):
         del self.regime_of_changepoint[self.cps[self.proposed_index]]
-        self.regime_of_changepoint[self.stored_cp].replace_cp(self.cps[self.proposed_index],self.stored_cp)
+        self.regime_of_changepoint[self.stored_cp].replace_cp( self.cps[self.proposed_index],self.stored_cp)
         self.cps[self.proposed_index]=self.stored_cp
         self.undo_lhd_changes()
         self.calculate_posterior(regime_model_pairs=[])
@@ -439,19 +442,19 @@ class ChangepointModel(object):
                 if self.stored_regime.length()>1:
                     self.affected_regime_model_pairs.add((self.stored_regime,pm_i))
                 cp_index=self.get_active_cp_to_left(self.proposed_index,pm_i)
-                self.affected_regime_model_pairs.add((self.regime_of_changepoint[self.cps[cp_index]],pm_i))
+                self.affected_regime_model_pairs.add( (self.regime_of_changepoint[self.cps[cp_index]],pm_i) )
 
 #        self.proposal_ratio-=self.LOG_T
         self.delete_changepoint(self.proposed_index)
         if self.infer_regimes:
-            self.regime_sequence,self.regime_sequence_inverse=create_numbering([self.regime_of_changepoint[self.cps[i]] for i in range(self.num_cps+1)])
+            self.regime_sequence,self.regime_sequence_inverse = create_numbering([self.regime_of_changepoint[self.cps[i]] for i in range(self.num_cps+1)])
 
-            dummy_regime_number,regime_log_proposal=self.regimes_model.propose_regime(self.num_regimes,self.regime_sequence[self.proposed_index-1],None if self.proposed_index==self.num_cps+1 else self.regime_sequence[self.proposed_index])
+            dummy_regime_number,regime_log_proposal = self.regimes_model.propose_regime(self.num_regimes, self.regime_sequence[self.proposed_index-1], None if self.proposed_index==self.num_cps+1 else self.regime_sequence[self.proposed_index])
             self.proposal_ratio+=regime_log_proposal
         self.calculate_posterior(self.affected_regime_model_pairs)
 
     def undo_delete_changepoint_proposal(self):
-        self.add_changepoint(cp=self.stored_cp,index=self.proposed_index,regime=self.stored_regime)
+        self.add_changepoint(cp=self.stored_cp, index=self.proposed_index,regime=self.stored_regime)
         self.undo_lhd_changes()
         self.calculate_posterior(regime_model_pairs=[])
 
@@ -465,8 +468,8 @@ class ChangepointModel(object):
                 regime_number=self.num_regimes
             else:
 #                regime_number=np.random.randint(self.num_regimes+1)
-                self.regime_sequence,self.regime_sequence_inverse=create_numbering([self.regime_of_changepoint[self.cps[i]] for i in range(self.num_cps+1)])
-                regime_number,regime_log_proposal=self.regimes_model.propose_regime(self.num_regimes,self.regime_sequence[self.proposed_index-1],None if self.proposed_index==self.num_cps+1 else self.regime_sequence[self.proposed_index])
+                self.regime_sequence,self.regime_sequence_inverse = create_numbering([self.regime_of_changepoint[self.cps[i]] for i in range(self.num_cps+1)])
+                regime_number,regime_log_proposal = self.regimes_model.propose_regime(self.num_regimes, self.regime_sequence[self.proposed_index-1], None if self.proposed_index==self.num_cps+1 else self.regime_sequence[self.proposed_index])
                 self.proposal_ratio-=regime_log_proposal
 
         regime=None if regime_number==self.num_regimes else self.regime_sequence_inverse[regime_number]
@@ -490,16 +493,16 @@ class ChangepointModel(object):
         self.proposed_index=index if index is not None else (2 if self.num_cps==2 else np.random.randint(2,self.num_cps+1))#first two cps have regimes 0 and 1 resp.
         self.from_regime=self.regime_of_changepoint[self.cps[self.proposed_index]]
         from_will_close=self.from_regime.length()==1
-        self.regime_sequence,self.regime_sequence_inverse=create_numbering([self.regime_of_changepoint[self.cps[i]] for i in range(self.num_cps+1)])
+        self.regime_sequence,self.regime_sequence_inverse = create_numbering([self.regime_of_changepoint[self.cps[i]] for i in range(self.num_cps+1)])
         regime_number=self.regime_sequence[self.proposed_index]
         if new_regime_number is None:
-            new_regime_number,regime_log_proposal=self.regimes_model.propose_regime(self.num_regimes,self.regime_sequence[self.proposed_index-1],None if self.proposed_index==self.num_cps else self.regime_sequence[self.proposed_index+1],self.regime_sequence[self.proposed_index],from_will_close)
+            new_regime_number,regime_log_proposal = self.regimes_model.propose_regime(self.num_regimes, self.regime_sequence[self.proposed_index-1], None if self.proposed_index==self.num_cps else self.regime_sequence[self.proposed_index+1], self.regime_sequence[self.proposed_index], from_will_close)
         if new_regime_number is None:
             mh_accept=False
             return()
         self.proposed_regime=None if new_regime_number==self.num_regimes else self.regime_sequence_inverse[new_regime_number]
 
-        self.change_regime_of_changepoint(self.cps[self.proposed_index],self.from_regime,self.proposed_regime)
+        self.change_regime_of_changepoint(self.cps[self.proposed_index], self.from_regime,self.proposed_regime)
         for pm_i in range(self.num_probability_models):
             from_active=not from_will_close and self.from_regime.model_is_active(pm_i)
             to_active=self.proposed_regime.model_is_active(pm_i)
@@ -509,25 +512,25 @@ class ChangepointModel(object):
                 self.affected_regime_model_pairs.add((self.proposed_regime,pm_i))
             if from_active!=to_active:
                 cp_index=self.get_active_cp_to_left(self.proposed_index,pm_i)
-                self.affected_regime_model_pairs.add((self.regime_of_changepoint[self.cps[cp_index]],pm_i))
+                self.affected_regime_model_pairs.add( (self.regime_of_changepoint[self.cps[cp_index]],pm_i) )
         self.calculate_posterior(self.affected_regime_model_pairs)
 
     def undo_change_regime_of_changepoint_proposal(self):
-        self.change_regime_of_changepoint(self.cps[self.proposed_index],self.proposed_regime,self.from_regime)
+        self.change_regime_of_changepoint(self.cps[self.proposed_index], self.proposed_regime,self.from_regime)
         self.undo_lhd_changes()
         self.calculate_posterior(regime_model_pairs=[])
 
     def propose_change_regime_inclusion_vector(self,regime_number=None,pm_index=None):
         self.proposed_regime_number=np.random.randint(1,self.num_regimes) if regime_number is None else regime_number
         self.proposed_pm_index=np.random.randint(self.num_probability_models) if pm_index is None else pm_index
-        self.regimes[self.proposed_regime_number].inclusion_vector_flip_position(self.proposed_pm_index)
+        self.regimes[self.proposed_regime_number].flip_inclusion(self.proposed_pm_index)
         self.calculate_posterior()
 
     def sample_inclusion_vector(self):
-        return(np.array(self.inclusion_prior.simulate_data(self.num_probability_models),dtype="bool")[0])
+        return(np.array(self.inclusion_prior.simulate_data(self.num_probability_models), dtype=bool)[0])
 
     def undo_change_regime_inclusion_vector_proposal(self):
-        self.regimes[self.proposed_regime_number].inclusion_vector_flip_position(self.proposed_pm_index)
+        self.regimes[self.proposed_regime_number].flip_inclusion(self.proposed_pm_index)
         self.undo_lhd_changes()
         self.calculate_posterior(regime_model_pairs=[])
 

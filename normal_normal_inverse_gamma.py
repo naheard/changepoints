@@ -1,3 +1,5 @@
+## normal_normal_inverse_gamma.py
+
 from probability_model import ProbabilityModel
 from data import Data
 import numpy as np
@@ -39,5 +41,5 @@ class NormalNIG(ProbabilityModel):
         return([np.random.normal(mu[i],sigma[i],size=n) for i in range(self.p)])
 
     def log_density(self,y,y2,n=1):
-        ld=self.density_constant-.5*n*LOG_PI-.5*np.log(1.0/self.v+n)+gammaln(self.a0+.5*n)-(self.a0+.5*n)*np.log(self.b0+0.5*(y2-y*y*(self.v/(n*self.v+1.0))))
+        ld=self.density_constant-.5*n*LOG_PI-.5*np.log(1.0/self.v+n)+gammaln(self.a0+.5*n) -(self.a0+.5*n)*np.log(self.b0+0.5*(y2-y*y*(self.v/(n*self.v+1.0))))
         return(ld)

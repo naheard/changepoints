@@ -1,4 +1,6 @@
 #! /usr/bin/env python3
+## simulate_changepoint_data.py
+
 import sys
 import numpy as np
 import matplotlib.pyplot as plt

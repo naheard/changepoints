@@ -1,3 +1,5 @@
+## poisson_gamma.py
+
 from probability_model import ProbabilityModel
 from data import Data
 import numpy as np

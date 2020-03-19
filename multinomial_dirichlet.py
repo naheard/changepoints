@@ -1,3 +1,5 @@
+## multinomial_dirichlet.py
+
 from probability_model import ProbabilityModel
 from data import Data
 import numpy as np
