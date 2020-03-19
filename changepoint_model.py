@@ -386,15 +386,14 @@ class ChangepointModel(object):
             return()
         self.get_available_move_types()
         self.proposal_ratio-=np.log(len(self.available_move_types))
-        self.accpeptance_ratio=self.proposal_ratio+self.posterior-self.stored_posterior
+        self.posterior_ratio=self.posterior-self.stored_posterior
+        self.accpeptance_ratio=self.proposal_ratio+self.posterior_ratio
         if self.accpeptance_ratio<0 and np.random.exponential()<-self.accpeptance_ratio:
             self.mh_accept=False
         if self.hill_climbing and self.iteration>=0:
-            self.mh_accept=self.posterior>=self.stored_posterior
+            self.mh_accept=self.posterior_ratio>=0
         if self.mh_accept:
             self.proposal_acceptance_counts[self.move_type]+=1
-#        else:
-#            self.undo_move()
 
     def randomly_select_cp_index(self):
         return(1 if self.num_cps==1 else np.random.randint(1,self.num_cps+1))
@@ -467,7 +466,6 @@ class ChangepointModel(object):
             if not self.infer_regimes:
                 regime_number=self.num_regimes
             else:
-#                regime_number=np.random.randint(self.num_regimes+1)
                 self.regime_sequence,self.regime_sequence_inverse = create_numbering([self.regime_of_changepoint[self.cps[i]] for i in range(self.num_cps+1)])
                 regime_number,regime_log_proposal = self.regimes_model.propose_regime(self.num_regimes, self.regime_sequence[self.proposed_index-1], None if self.proposed_index==self.num_cps+1 else self.regime_sequence[self.proposed_index])
                 self.proposal_ratio-=regime_log_proposal
