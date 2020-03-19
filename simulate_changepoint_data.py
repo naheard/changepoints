@@ -12,7 +12,7 @@ from multinomial_dirichlet import MultinomialDirichlet
 from normal_normal_inverse_gamma import NormalNIG
 from collections import defaultdict
 
-def simulate_changepoints_and_regimes(n=1000,lambda_cps=.01,n_cps=None,n_prob_models=1,inclusion_ps=.8,seed=None,tau_filename=None):
+def simulate_changepoints_and_regimes(n=1000, lambda_cps=.01, n_cps=None, n_prob_models=1, inclusion_ps=.8, seed=None, tau_filename=None):
     if seed is not None:
         np.random.seed(seed)
     if n_cps is None:
@@ -31,7 +31,7 @@ def simulate_changepoints_and_regimes(n=1000,lambda_cps=.01,n_cps=None,n_prob_mo
         np.savetxt(tau_filename,tau,delimiter=",",fmt='%1.3f',newline=" ")
     return(tau,regimes,inclusion_vectors)
 
-def simulate_parameters(inclusion_vectors,prob_models):
+def simulate_parameters(inclusion_vectors, prob_models):
     regime_parameters=defaultdict(dict)
     for i in range(len(prob_models)):
         for j in range(inclusion_vectors.shape[1]):
@@ -40,7 +40,7 @@ def simulate_parameters(inclusion_vectors,prob_models):
 
     return(regime_parameters)
 
-def simulate_changepoint_data(n,inclusion_vector=[1],tau=[],regimes=[0],num_categories=np.array([3,5],dtype=int),seed=None,model=None,theta_map=None,y_filename=None,x_filename=None):
+def simulate_changepoint_data(n, inclusion_vector=[1], tau=[], regimes=[0], num_categories=np.array([3,5],dtype=int), seed=None, model=None, theta_map=None, y_filename=None, x_filename=None):
     if seed is not None:
         np.random.seed(seed)
     n_cps=len(tau)
@@ -64,18 +64,18 @@ def simulate_changepoint_data(n,inclusion_vector=[1],tau=[],regimes=[0],num_cate
         np.savetxt(x_filename,x,delimiter=",")
     return(Data(y,x))#x,y)
 
-def simulate(n,probability_models,lambda_cps=0.01,seed=None):
-    cps,regimes,inclusion_vectors=simulate_changepoints_and_regimes(n=n,lambda_cps=lambda_cps,n_prob_models=len(probability_models),inclusion_ps=.8,seed=seed,tau_filename="tau.txt")
+def simulate(n, probability_models, lambda_cps=0.01, seed=None):
+    cps,regimes,inclusion_vectors = simulate_changepoints_and_regimes(n=n, lambda_cps=lambda_cps, n_prob_models=len(probability_models), inclusion_ps=.8, seed=seed, tau_filename="tau.txt")
     theta_maps=simulate_parameters(inclusion_vectors,probability_models)
     xys=[]
     for i in range(len(probability_models)):
         pm=probability_models[i]
         file_ending="_"+str(i)+".txt"
-        xys.append(simulate_changepoint_data(n=n,y_filename="y"+file_ending,x_filename="x"+file_ending,seed=seed,tau=cps,regimes=regimes,model=pm,theta_map=theta_maps[pm]))
+        xys.append(simulate_changepoint_data(n=n, y_filename="y"+file_ending, x_filename="x"+file_ending, seed=seed, tau=cps, regimes=regimes, model=pm, theta_map=theta_maps[pm]))
 
     return(cps,regimes,inclusion_vectors,xys)
 
-def plot_data(cps,regimes,inclusion_vectors,xys,estimated_cps=None,estimated_regimes=None,estimated_inclusion_vectors=None,plot_dim=0):
+def plot_data(cps, regimes,inclusion_vectors, xys, estimated_cps=None, estimated_regimes=None, estimated_inclusion_vectors=None, plot_dim=0):
     n_models=len(xys)
     plt.figure(figsize=(12,4*n_models))
     for index in range(n_models):
@@ -101,7 +101,7 @@ def plot_data(cps,regimes,inclusion_vectors,xys,estimated_cps=None,estimated_reg
 def main():
     n=1000 if len(sys.argv)<2 else int(sys.argv[1])
     s=0 if len(sys.argv)<3 else int(sys.argv[2])
-    probability_models=[MultinomialDirichlet(k=np.array([3,5],dtype=int),alpha=1),NormalNIG(p=3,alpha_beta=[.1,.1],v=1)]
+    probability_models=[MultinomialDirichlet(k=np.array([3,5],dtype=int),alpha=1), NormalNIG(p=3,alpha_beta=[.1,.1],v=1)]
     simulate(n,probability_models,s)
 
 #main()
