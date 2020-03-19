@@ -387,7 +387,7 @@ class ChangepointModel(object):
         self.accpeptance_ratio=self.proposal_ratio+self.posterior-self.stored_posterior
         if self.accpeptance_ratio<0 and np.random.exponential()<-self.accpeptance_ratio:
             self.mh_accept=False
-        if self.hill_climbing:
+        if self.hill_climbing and self.iteration>=0:
             self.mh_accept=self.posterior>=self.stored_posterior
         if self.mh_accept:
             self.proposal_acceptance_counts[self.move_type]+=1
@@ -548,8 +548,35 @@ class ChangepointModel(object):
             self.print_acceptance_rates()
             exit()
 
+    def changepoint_vector_precision_recall(self,cp_locations):
+        return(changepoint_vectors_precision_recall([cp.tau for cp in self.cps],cp_locations))
+
 def significantly_different(x,y,epsilon=1e-5):
     return(np.abs(x-y)>epsilon)
+
+def changepoint_vectors_precision_recall(x,y,window=.1):
+    n_x,n_y=len(x),len(y)
+    n_x_in_y=0
+    j=0
+    for i in range(n_x):
+        while j<n_y and y[j]<x[i]-window:
+            j+=1
+        if j<n_y and y[j]<=x[i]+window:
+            n_x_in_y+=1
+            j+=1
+
+    rate_x=n_x_in_y/float(n_x) if n_x>0 else 1
+    n_y_in_x=0
+    j=0
+    for i in range(n_y):
+        while j<n_x and x[j]<y[i]-window:
+            j+=1
+        if j<n_x and x[j]<=y[i]+window:
+            n_y_in_x+=1
+            j+=1
+
+    rate_y=n_y_in_x/float(n_y) if n_y>0 else 1
+    return(rate_x,rate_y)
 
 def create_numbering(x):
     if len(x)==0:
