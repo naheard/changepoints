@@ -17,7 +17,7 @@ nlm=NormalLinearModel(dat,alpha_beta=[1,10.0],v=1)
 up=UniformPareto(dat,alpha_beta=[.01,4])
 tau=np.loadtxt('tau.txt')
 #print(md.changepoint_likelihood(tau=tau))
-cpm=ChangepointModel([md],infer_regimes=True,disallow_successive_regimes=True,spike_regimes=not False)#,pg])
+cpm=ChangepointModel([md,pg],infer_regimes=True,disallow_successive_regimes=True,spike_regimes=not False)#,pg])
 do_mcmc=True
 if not do_mcmc:
     cpm.write_changepoints_and_regimes()

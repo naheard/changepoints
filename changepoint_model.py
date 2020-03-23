@@ -193,8 +193,11 @@ class ChangepointModel(object):
         self.regimes.sort()
 
     def write_changepoints_and_regimes(self,stream=sys.stderr,delim="\t"):
-        self.get_regime_numbers()
-        stream.write(delim.join([":".join(map(str,(cp.tau, self.regime_numbers[self.regime_of_changepoint[cp]]))) for cp in self.cps])+"\n")
+        if self.infer_regimes:
+            self.get_regime_numbers()
+            stream.write(delim.join([":".join(map(str,(cp.tau, self.regime_numbers[self.regime_of_changepoint[cp]]))) for cp in self.cps])+"\n")
+        else:
+            stream.write(delim.join([str(cp.tau) for cp in self.cps])+"\n")
 
     def write_regime_inclusion_vectors(self,stream=sys.stderr,delim="\t"):
         self.order_regimes()
@@ -336,7 +339,8 @@ class ChangepointModel(object):
 #            self.check_posterior()
 
         self.write_changepoints_and_regimes()
-        self.write_regime_inclusion_vectors()
+        if self.infer_regimes:
+            self.write_regime_inclusion_vectors()
         sys.stderr.write("Final posterior="+str(self.posterior)+"\n")
         self.print_acceptance_rates()
         self.calculate_posterior_means()

@@ -65,13 +65,15 @@ def simulate_changepoint_data(n, inclusion_vector=[1], tau=[], regimes=[0], num_
     return(Data(y,x))#x,y)
 
 def simulate(n, probability_models, lambda_cps=0.01, seed=None):
-    cps,regimes,inclusion_vectors = simulate_changepoints_and_regimes(n=n, lambda_cps=lambda_cps, n_prob_models=len(probability_models), inclusion_ps=.8, seed=seed, tau_filename="tau.txt")
+    n_prob_models=len(probability_models)
+    n=n if hasattr(n, "__len__") else np.repeat(n,n_prob_models)
+    cps,regimes,inclusion_vectors = simulate_changepoints_and_regimes(n=max(n), lambda_cps=lambda_cps, n_prob_models=len(probability_models), inclusion_ps=.8, seed=seed, tau_filename="tau.txt")
     theta_maps=simulate_parameters(inclusion_vectors,probability_models)
     xys=[]
-    for i in range(len(probability_models)):
+    for i in range(n_prob_models):
         pm=probability_models[i]
         file_ending="_"+str(i)+".txt"
-        xys.append(simulate_changepoint_data(n=n, y_filename="y"+file_ending, x_filename="x"+file_ending, seed=seed, tau=cps, regimes=regimes, model=pm, theta_map=theta_maps[pm]))
+        xys.append(simulate_changepoint_data(n=n[i], y_filename="y"+file_ending, x_filename="x"+file_ending, seed=seed, tau=cps, regimes=regimes, model=pm, theta_map=theta_maps[pm]))
 
     return(cps,regimes,inclusion_vectors,xys)
 
