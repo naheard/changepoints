@@ -8,7 +8,7 @@ class Data(object):
     #y is a (pxn) matrix of data 'observations'
     #x is an n-vector of time points (or some other univariate covariate)
     def __init__(self, y=[], x=None, cts=None, transpose=False):
-        self.Sy = self.Sy2 = self.Sx = self.Sx2= self.Sxy = self.categories = self.num_categories = self.cum_counts = None
+        self.Sy = self.Sy2 = self.Sx = self.Sx2= self.Sxy = self.categories = self.num_categories = self.cum_counts = self.Kx = None
         if y is not None:
             self.y=np.atleast_2d(y)
             self.p, self.n=self.y.shape
@@ -206,6 +206,18 @@ class Data(object):
 
     def get_x_max(self):
         return(self.n-1 if self.x is None else max(self.x))
+
+    def create_kernel_covariance_matrix(self,kernel=None):
+        if kernel is None:
+            kernel=gaussian_kernel
+        self.Kx=np.ones([self.n,self.n])
+        for i in range(self.n):
+            for j in range(i):
+                kij=kernel(i,j) if self.x is None else kernel(self.x[i],self.x[j])
+                self.Kx[i,j]=self.Kx[j,i]=kernel(self.x[i],self.x[j])
+
+def gaussian_kernel(x1,x2,l=1):
+    return(np.exp(-.5*((x1-x2)/float(l))**2))
 
 def word_counts_from_file(file,delim=" "):
     import string
