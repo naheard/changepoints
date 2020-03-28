@@ -110,6 +110,8 @@ class Data(object):
             return(self.get_diff_between(self.Sx,start,end))
         else:
             if self.x is None:
+                if end is None:
+                    end=self.n
                 return(end-start)
             else:
                 return(np.sum(self.x[start:end]))
@@ -120,6 +122,8 @@ class Data(object):
             return(self.get_diff_between(self.Sx2,start,end))
         else:
             if self.x is None:
+                if end is None:
+                    end=self.n
                 if start<=1:
                     return(end*(end-1)*(2*end-1)/6.0)
                 return((end*(end-1)*(2*end-1)-start*(start-1)*(2*start-1))/6.0)
@@ -141,6 +145,14 @@ class Data(object):
                     return(np.sum(np.multiply(self.x[start:end],self.y[:,start:end])))
                 else:
                     return(np.sum(np.multiply(self.x[start:end],self.y[j,start:end])))
+
+    def get_combined_ys(self,dim=0,start_end=[(0,None)]):
+        return(np.concatenate([self.y[:,start:end] for start,end in start_end],axis=0))
+
+    def get_combined_xs(self,start_end=[(0,None)]):
+        if self.x is None:
+            returnreturn(np.concatenate([range(start,end if end is not None else self.n) for start,end in start_end]))
+        return(np.concatenate([self.x[start:end] for start,end in start_end]))
 
     def get_combined_y_sums(self,dim=0,start_end=[(0,None)]):
         return(np.sum([self.get_y_sum_between(start,end,dim) for start,end in start_end],axis=0))
