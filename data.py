@@ -210,14 +210,14 @@ class Data(object):
     def get_x_max(self):
         return(self.n-1 if self.x is None else max(self.x))
 
-    def create_kernel_covariance_matrix(self,kernel=None):
+    def create_kernel_covariance_matrix(self,kernel=None,par=None):
         if kernel is None:
             kernel=gaussian_kernel
         self.Kx=np.ones([self.n,self.n])
         for i in range(self.n):
             for j in range(i):
                 kij=kernel(i,j) if self.x is None else kernel(self.x[i],self.x[j])
-                self.Kx[i,j]=self.Kx[j,i]=kernel(self.x[i],self.x[j])
+                self.Kx[i,j]=self.Kx[j,i]=kernel(self.x[i],self.x[j],par=par)
 
     def get_combined_kernel_covariance_matrix(self,start_end):
         indices=self.get_combined_indices(start_end)
@@ -231,7 +231,8 @@ class Data(object):
 
         return(K)
 
-def gaussian_kernel(x1,x2,l=1):
+def gaussian_kernel(x1,x2,par=None):
+    l=1 if par is None else par
     return(np.exp(-.5*((x1-x2)/float(l))**2))
 
 def word_counts_from_file(file,delim=" "):
