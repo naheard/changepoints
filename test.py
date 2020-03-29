@@ -4,6 +4,7 @@ from multinomial_dirichlet import MultinomialDirichlet
 from poisson_gamma import PoissonGamma
 from normal_normal_inverse_gamma import NormalNIG
 from normal_linear_model import NormalLinearModel
+from gaussian_process import GP
 from uniform_pareto import UniformPareto
 from changepoint_model import ChangepointModel
 import numpy as np
@@ -14,6 +15,7 @@ md=MultinomialDirichlet(dat_txt,alpha=.01)
 pg=PoissonGamma(dat,alpha_beta=[.01,.01])
 nig=NormalNIG(dat,alpha_beta=[.01,.01],v=1)
 nlm=NormalLinearModel(dat,alpha_beta=[1,10.0],v=1)
+gp=GP(dat,alpha_beta=[1,10.0],l=1)
 up=UniformPareto(dat,alpha_beta=[.01,4])
 tau=np.loadtxt('tau.txt')
 #print(md.changepoint_likelihood(tau=tau))

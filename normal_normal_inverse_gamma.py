@@ -22,7 +22,6 @@ class NormalNIG(ProbabilityModel):
             self.data.calculate_y_cumulative_sum_sq()
 
     def likelihood_component(self,j=0,start_end=[(0,None)],y=None):
-        lhd=self.density_constant
         sy=sum(y) if y is not None else self.data.get_combined_y_sums(j,start_end)
         sy2=sum(y*y) if y is not None else self.data.get_combined_y_sum_squares(j,start_end)
         n=len(y) if y is not None else sum([(e if e is not None else self.data.n)-s for s,e in start_end])
@@ -30,7 +29,7 @@ class NormalNIG(ProbabilityModel):
 
     def sample_parameter(self):
         sigma=1.0/np.sqrt(np.random.gamma(self.a0,1.0/self.b0,size=self.p))
-        mu=np.random.normal(scale=sigma*self.v,size=self.p)
+        mu=np.array([np.random.normal(scale=s*self.v) for s in sigma])
         return(mu,sigma)
 
     def simulate_data(self,n,thetas=None,x=None):

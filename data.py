@@ -146,12 +146,15 @@ class Data(object):
                 else:
                     return(np.sum(np.multiply(self.x[start:end],self.y[j,start:end])))
 
+    def get_combined_indices(self,start_end=[(0,None)]):
+        return(np.concatenate([range(start,end if end is not None else self.n) for start,end in start_end]))
+
     def get_combined_ys(self,dim=0,start_end=[(0,None)]):
-        return(np.concatenate([self.y[:,start:end] for start,end in start_end],axis=0))
+        return(np.concatenate([self.y[dim,start:end] for start,end in start_end],axis=0))
 
     def get_combined_xs(self,start_end=[(0,None)]):
         if self.x is None:
-            returnreturn(np.concatenate([range(start,end if end is not None else self.n) for start,end in start_end]))
+            return(self.get_combined_indices(start_end))
         return(np.concatenate([self.x[start:end] for start,end in start_end]))
 
     def get_combined_y_sums(self,dim=0,start_end=[(0,None)]):
@@ -215,6 +218,18 @@ class Data(object):
             for j in range(i):
                 kij=kernel(i,j) if self.x is None else kernel(self.x[i],self.x[j])
                 self.Kx[i,j]=self.Kx[j,i]=kernel(self.x[i],self.x[j])
+
+    def get_combined_kernel_covariance_matrix(self,start_end):
+        indices=self.get_combined_indices(start_end)
+        n_indices=len(indices)
+        K=np.ones([n_indices,n_indices])
+        for i_ in range(n_indices):
+            i=indices[i_]
+            for j_ in range(i_):
+                j=indices[j_]
+                K[i_,j_]=K[j_,i_]=self.Kx[i,j]
+
+        return(K)
 
 def gaussian_kernel(x1,x2,l=1):
     return(np.exp(-.5*((x1-x2)/float(l))**2))
