@@ -18,7 +18,7 @@ class MultinomialDirichlet(ProbabilityModel):
         self.calculate_data_summaries()
         if self.k is None:
             self.k=self.data.num_categories
-        self.alphas=alpha if hasattr(alpha, "__len__") else np.array([np.repeat(alpha,self.k[j]) for j in range(len(self.k))])
+        self.alphas=alpha if hasattr(alpha, "__len__") else np.array([np.repeat(alpha,self.k[j]) for j in range(len(self.k))], dtype=object)
         self.alpha_dots=np.array([sum(a) for a in self.alphas])
         self.data_type=int
 

@@ -191,7 +191,7 @@ class Data(object):
         else:
             self.num_categories=num_categories
 
-        self.cum_counts = np.array([np.zeros((num_categories[j],self.n),dtype=int) for j in range(self.p)])
+        self.cum_counts = np.array([np.zeros((num_categories[j],self.n),dtype=int) for j in range(self.p)], dtype=object)
         for j in range(self.p):
             for i in range(self.n):
                 if i>0:
