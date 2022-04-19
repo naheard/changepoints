@@ -147,7 +147,7 @@ class Data(object):
                     return(np.sum(np.multiply(self.x[start:end],self.y[j,start:end])))
 
     def get_combined_indices(self,start_end=[(0,None)]):
-        return(np.concatenate([range(start,end if end is not None else self.n) for start,end in start_end]))
+        return(np.concatenate([np.arange(start,end if end is not None else self.n) for start,end in start_end]))
 
     def get_combined_ys(self,dim=0,start_end=[(0,None)]):
         return(np.concatenate([self.y[dim,start:end] for start,end in start_end],axis=0))
