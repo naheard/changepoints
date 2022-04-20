@@ -106,4 +106,4 @@ def main():
     probability_models=[MultinomialDirichlet(k=np.array([3,5],dtype=int),alpha=1), NormalNIG(p=3,alpha_beta=[.1,.1],v=1)]
     simulate(n,probability_models,0.01,s)
 
-#main()
+main()

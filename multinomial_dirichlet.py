@@ -33,10 +33,10 @@ class MultinomialDirichlet(ProbabilityModel):
 
     def likelihood_component(self,j=0,start_end=[(0,None)],y=None):
         counts=y if y is not None else self.data.get_combined_y_cumulative_counts(j,start_end)
-        return(self.log_density(counts,self.alphas[j],self.alpha_dots[j]))
+        return(self.log_density(counts,np.array(self.alphas[j],dtype='float'),self.alpha_dots[j]))
 
     def sample_parameter(self):
-        return([np.random.dirichlet(a) for a in self.alphas])
+        return([np.random.dirichlet(np.array(a,dtype='float')) for a in self.alphas])
 
     def simulate_data(self,n,thetas=None,x=None):
         if thetas is None:
