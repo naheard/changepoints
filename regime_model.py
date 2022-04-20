@@ -12,6 +12,7 @@ class RegimeModel(ProbabilityModel):
         self.disallow_successive_regimes=disallow_successive_regimes
         self.spike_regimes=spike_regimes
         self.data_type=int
+        self.max_num_regimes=int(float("inf"))
 
     def likelihood_component(self,j=0,start_end=[(0,None)],y=None):
         if y is not None:
@@ -40,7 +41,7 @@ class RegimeModel(ProbabilityModel):
         return(sample_parameter())
 
     def log_density(self,y):
-        if y[0]!=0 or self.disallow_successive_regimes and 0 in np.diff(y):
+        if y[0]!=0 or (self.disallow_successive_regimes and 0 in np.diff(y)) or max(y)>=self.max_num_regimes:
             return(-float("inf"))#first regime must be zero
         n=len(y)
         if self.spike_regimes:
@@ -64,14 +65,14 @@ class RegimeModel(ProbabilityModel):
         return(log_p_regimes)
 
     def propose_regime(self,num_regimes,left_regime=None,right_regime=None, current_regime=None,solo=False):
-        blocked_regimes=[current_regime]
+        blocked_regimes=[current_regime] if current_regime is not None else []
         if self.disallow_successive_regimes:
             for r in (left_regime,right_regime):
                 if r is not None:
                     blocked_regimes+=[r]
 
         possible_regimes=[0] if self.spike_regimes else list(range(num_regimes))
-        if not solo:
+        if not solo and num_regimes<self.max_num_regimes:
             possible_regimes+=[num_regimes]
         allowed_regimes=[r for r in possible_regimes if r not in blocked_regimes]
         num_allowed_regimes=len(allowed_regimes)

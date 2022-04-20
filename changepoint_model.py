@@ -474,7 +474,7 @@ class ChangepointModel(object):
                 regime_number,regime_log_proposal = self.regimes_model.propose_regime(self.num_regimes, self.regime_sequence[self.proposed_index-1], None if self.proposed_index==self.num_cps+1 else self.regime_sequence[self.proposed_index])
                 self.proposal_ratio-=regime_log_proposal
 
-        regime=None if regime_number==self.num_regimes else self.regime_sequence_inverse[regime_number]
+        regime=None if regime_number in (self.num_regimes,None) else self.regime_sequence_inverse[regime_number]
         self.add_changepoint(t,regime,index=self.proposed_index)
         for pm_i in range(self.num_probability_models):
             if self.proposed_regime.model_is_active(pm_i):
