@@ -37,3 +37,11 @@ class PoissonGamma(ProbabilityModel):
             return(0)
         ld=self.density_constant+gammaln(self.a0+r)-(self.a0+r)*np.log(self.b0+n*self.T)
         return(ld)
+
+    def component_mean(self,j=0,start_end=[(0,None)],y=None):
+        r=y if y is not None else self.data.get_combined_y_sums(j,start_end)
+        n=1 if y is not None else sum([e-s for s,e in start_end])
+        return(self.mean_par(r,n))
+
+    def mean_par(self,r,n=1):
+        return((self.a0+r)/(self.b0+n*self.T))

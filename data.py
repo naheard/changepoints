@@ -20,11 +20,21 @@ class Data(object):
             self.n=self.y.shape[1]
         if transpose:
             self.y=self.y.transpose()
+            self.p, self.n=self.n, self.p
         self.x=None if x is None else np.array(x)
 
     @classmethod
-    def from_arguments(cls, yfile, xfile=None, dtype=float, xdtype=float, transpose=False,delim=",",y_textfile=False):
+    def from_arguments(cls, yfile=None, xfile=None, xyfile=None, dtype=float, xdtype=float, transpose=False,delim=",",y_textfile=False):
         y=cts=None
+        if xyfile is not None: #a single file containing both xs and ys
+            xy = np.loadtxt(xyfile,delimiter=delim)
+            if not transpose: # first row are xs, subsequent rows are ys
+                x = np.array(xy[0,:],dtype=xdtype)
+                y = np.array(xy[1:,:],dtype=dtype)
+            else: # first column are xs, subsequent columns are ys
+                x = np.array(xy.T[0,:],dtype=xdtype)
+                y = np.array(xy.T[1:,:].T,dtype=dtype)
+            return(cls(y,x,cts,transpose))
         if not y_textfile:
             y=np.loadtxt(yfile,dtype=dtype,delimiter=delim)
         else:
@@ -67,6 +77,8 @@ class Data(object):
     @staticmethod
     def get_mx_diff_between(mx,start,end,j=None):
         end_index=mx.shape[1] if end is None else end
+        if end_index ==0:
+            return 0
         if j is None:
             return(mx[:,end_index-1]-(mx[:,start-1] if start>0 else 0))
         else:
@@ -75,6 +87,8 @@ class Data(object):
     @staticmethod
     def get_diff_between(ar,start,end):
         end_index=len(ar) if end is None else end
+        if end_index ==0:
+            return 0
         return(ar[end_index-1]-(ar[start-1] if start>0 else 0))
 
     def get_y_sum_between(self,start,end,j=None):

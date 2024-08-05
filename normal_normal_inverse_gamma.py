@@ -42,3 +42,12 @@ class NormalNIG(ProbabilityModel):
     def log_density(self,y,y2,n=1):
         ld=self.density_constant-.5*n*LOG_PI-.5*np.log(1.0/self.v+n)+gammaln(self.a0+.5*n) -(self.a0+.5*n)*np.log(self.b0+0.5*(y2-y*y*(self.v/(n*self.v+1.0))))
         return(ld)
+
+    def component_mean(self,j=0,start_end=[(0,None)],y=None):
+        sy=sum(y) if y is not None else self.data.get_combined_y_sums(j,start_end)
+        sy2=sum(y*y) if y is not None else self.data.get_combined_y_sum_squares(j,start_end)
+        n=len(y) if y is not None else sum([(e if e is not None else self.data.n)-s for s,e in start_end])
+        return(self.mean_par(sy,sy2,n))
+
+    def mean_par(self,y,y2,n=1):
+        return(y*(self.v/(n*self.v+1.0)))

@@ -31,8 +31,15 @@ class ProbabilityModel(ABC):
                 lhd+=self.likelihood_component(j,start_end)
         else:
             lhd=self.likelihood_component(0,y=y)
-
         return(lhd)
+
+    def mean(self,start_end=[(0,None)],y=None):
+        means = []
+        if self.data is not None:
+            means+=[self.component_mean(j,start_end) for j in range(self.data.p)]
+        else:
+            means+=[self.component_mean(0,y=y)]
+        return(means)
 
     def get_dimension(self):
         return(self.p)

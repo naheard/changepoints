@@ -539,6 +539,15 @@ class ChangepointModel(object):
     def calculate_posterior_means(self):
         self.mean_num_cps=sum([k*self.num_cps_counter[k] for k in self.num_cps_counter])/sum(self.num_cps_counter.values())
 
+    def calculate_regime_posterior_means(self):
+        regime_model_pairs=list(itertools.product(self.regimes, range(self.num_probability_models)))
+        regime_model_means = []
+        for r,pm_i in regime_model_pairs:
+            if r.model_is_active(pm_i):
+                start_end=[self.get_changepoint_segment_start_end(pm_i,cp) for cp in r.cps]
+                regime_model_means += [self.probability_models[pm_i].mean(start_end)]
+        return(regime_model_means)
+
     def print_acceptance_rates(self,stream=sys.stderr):
         for m,c in self.proposal_move_counts.most_common():
             a=self.proposal_acceptance_counts[m]

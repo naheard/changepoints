@@ -63,5 +63,16 @@ class NormalLinearModel(ProbabilityModel):
         m_nT__V_n_inv__m_n=m_n[0]*(m_n[0]*(n+self.v_inv1)+m_n[1]*x) + m_n[1]*(m_n[0]*x+m_n[1]*(x2+self.v_inv2))
         a_n=self.a0+n #Posterior gamma shape parameter of sigma
         b_n=self.b0+.5*(y2-m_nT__V_n_inv__m_n) #Posterior gamma scale parameter of sigma
+        if b_n<0:
+            print("!",n)
+            print(b_n,n,y2,m_nT__V_n_inv__m_n)
+            exit()
         lhd=self.density_constant+.5*log_det_V_n-a_n*np.log(b_n)+gammaln(a_n)
         return(lhd)
+
+    def component_mean(self,j=0,start_end=[(0,None)],y=None,x=None):
+        return(self.mean_par(*self.get_summary_stats(j,start_end,y,x)))
+
+    def mean_par(self,y,y2,x,x2,xy,n=1):
+        det_V_n_inv=(n+self.v_inv1)*(x2+self.v_inv2)-x**2
+        return(np.array([(x2+self.v_inv2)*y-x*xy,-x*y+(n+self.v_inv1)*xy])/det_V_n_inv)

@@ -30,3 +30,11 @@ class UniformPareto(ProbabilityModel):
             return(0)
         ld=self.density_constant-np.log(self.a0+n)+(self.a0+n)*np.log(max(self.b0,r))
         return(ld)
+
+    def component_mean(self,j=0,start_end=[(0,None)],y=None):
+        max_x=y if y is not None else self.data.get_combined_y_maxs(j,start_end)
+        n=1 if y is not None else sum([e-s for s,e in start_end])
+        return(self.mean_par(max_x,n))
+
+    def mean_par(self,r,n=1):
+        return((self.a0+n)*max(self.b0,r)/(self.a0+n-1) if self.a0+n>1 else np.inf)

@@ -42,3 +42,16 @@ class GP(ProbabilityModel):
         yK_invy=sum([sum([ys[i]*K_inv[i,j]*ys[j] for j in range(n)]) for i in range(n)])
         ld=self.density_constant-ldetK-(self.a0+.5*n)*np.log(self.b0+.5*yK_invy)-gammaln(self.a0+.5*n)
         return(ld)
+
+    def component_mean(self,j=0,start_end=[(0,None)],y=None):
+        ys=self.data.get_combined_ys(j,start_end)
+        n=len(ys)
+        K=self.v*self.data.get_combined_kernel_covariance_matrix(start_end)+np.identity(n)
+        return(self.mean_par(ys,K,n))
+
+    def mean_par(self,ys,K,n=1):
+        ldetK=np.linalg.slogdet(K)[1]
+        K_inv=np.linalg.inv(K)
+        K2 = K - np.identity(n)
+        return([sum([sum([K2[i,_]*K_inv[i,j]*ys[j] for j in range(n)]) for i in range(n)]) for _ in range(n)])
+
