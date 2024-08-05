@@ -245,6 +245,31 @@ class Data(object):
 
         return(K)
 
+    def plot(self,cps, regimes,inclusion_vectors,means=None,plot_dim=0,log_x=False,log_y=False):
+        import matplotlib.pyplot as plt
+        plt.figure(figsize=(12,4*self.p))
+        for index in range(self.p):
+            plt.subplot(self.p,1,index+1)
+            plt.autoscale(enable=True, axis='x', tight=True)
+            r=0
+            for i in range(len(cps)):
+                new_r=regimes[i] if regimes is not None else i+1
+                if (inclusion_vectors[index,new_r] if inclusion_vectors is not None else True) and new_r!=r:
+                    plt.axvline(x=cps[i],linewidth=.8,color='red')
+                    r=new_r
+                else:
+                    plt.axvline(x=cps[i],linewidth=.8,color='pink')
+            if means is not None:
+                xs = np.insert(np.insert(cps,len(cps),np.max(self.x)),0,np.min(self.x))
+                for i in range(len(means)):
+                    plt.plot((xs[i],xs[i+1]),(means[i],means[i]),c='#8ace00')
+        plt.scatter(self.x,self.y[plot_dim,:],marker="x",s=1.5)
+        if log_x:
+            plt.xscale('log')
+        if log_y:
+            plt.yscale('log')
+        plt.show()
+
 def gaussian_kernel(x1,x2,par=None):
     l=1 if par is None else par
     return(np.exp(-.5*((x1-x2)/float(l))**2))
