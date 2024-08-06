@@ -106,7 +106,7 @@ class ChangepointModel(object):
         self.max_num_changepoints=float("inf")
         self.min_cp_spacing=float(self.T)/self.N
         self.infer_regimes=infer_regimes
-        self.changepoint_prior=PoissonGamma(alpha_beta=[.01,100])
+        self.changepoint_prior=PoissonGamma(alpha_beta=[.01,10])
         self.inclusion_prior=None if self.num_probability_models==1 else BernoulliBeta(alpha_beta=[.01,10])
         if self.infer_regimes:
             self.regimes_model=RegimeModel(disallow_successive_regimes,spike_regimes)

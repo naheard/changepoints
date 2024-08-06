@@ -18,11 +18,13 @@ class PoissonGamma(ProbabilityModel):
     def calculate_data_summaries(self):
         if self.data is not None:
             self.data.calculate_y_cumulative_sum()
+            self.data.calculate_y_cumulative_sum_log_factorials()
 
     def likelihood_component(self,j=0,start_end=[(0,None)],y=None):
         r=y if y is not None else self.data.get_combined_y_sums(j,start_end)
         n=1 if y is not None else sum([e-s for s,e in start_end])
-        return(self.log_density(r,n))
+        slyf = gammaln(r+1) if y is not None else self.data.get_combined_y_factorials(j,start_end)
+        return(self.log_density(r,n,slyf))
 
     def sample_parameter(self):
         return(np.random.gamma(self.a0,self.b0,size=self.p))
@@ -32,10 +34,12 @@ class PoissonGamma(ProbabilityModel):
             thetas=self.sample_parameter()
         return([np.random.poisson(theta,size=n) for theta in thetas])
 
-    def log_density(self,r,n=1):
+    def log_density(self,r,n=1,s=None):
         if n==0:
             return(0)
-        ld=self.density_constant+gammaln(self.a0+r)-(self.a0+r)*np.log(self.b0+n*self.T)
+        if s is None:
+            s = lngamma(r+1)
+        ld=self.density_constant+gammaln(self.a0+r)-(self.a0+r)*np.log(self.b0+n*self.T)-s
         return(ld)
 
     def component_mean(self,j=0,start_end=[(0,None)],y=None):

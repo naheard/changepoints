@@ -2,13 +2,14 @@
 
 import numpy as np
 from collections import defaultdict,Counter
+from scipy.special import gammaln
 #from bisect import bisect
 
 class Data(object):
     #y is a (pxn) matrix of data 'observations'
     #x is an n-vector of time points (or some other univariate covariate)
     def __init__(self, y=[], x=None, cts=None, transpose=False):
-        self.Sy = self.Sy2 = self.Sx = self.Sx2= self.Sxy = self.categories = self.num_categories = self.cum_counts = self.Kx = None
+        self.Sy = self.Sy2 = self.Sx = self.Sx2= self.Sxy = self.Slyf = self.categories = self.num_categories = self.cum_counts = self.Kx = None
         if y is not None:
             self.y=np.atleast_2d(y)
             self.p, self.n=self.y.shape
@@ -55,6 +56,9 @@ class Data(object):
 
     def calculate_y_cumulative_sum_sq(self):
         self.Sy2=np.cumsum(self.y*self.y,axis=1)
+
+    def calculate_y_cumulative_sum_log_factorials(self):
+        self.Slyf=np.atleast_2d([np.cumsum([gammaln(yi+1) for yi in y]) for y in self.y])
 
     def calculate_x_cumulative_sum(self):
         if self.x is not None:
@@ -118,6 +122,16 @@ class Data(object):
             else:
                 return(np.sum(self.y[j,start:end]**2))
 
+    def get_y_factorial_prod_between(self,start,end,j=None):
+        #return product of factorial terms of y[start:end]
+        if self.Slyf is not None:
+            return(self.get_mx_diff_between(self.Slyf,start,end,j))
+        else:
+            if j is None:
+                return([np.sum([gammaln(yi+1) for yi in y]) for y in self.y[:,start:end]**2])
+            else:
+                return(np.sum([gammaln(yi+1) for yi in self.y[j,start:end]**2]))
+
     def get_x_sum_between(self,start,end):
         #return sum of x[start:end]
         if self.Sx is not None:
@@ -179,6 +193,9 @@ class Data(object):
 
     def get_combined_y_sum_squares(self,dim=0,start_end=[(0,None)]):
         return(np.sum([self.get_y_sum_squares_between(start,end,dim) for start,end in start_end],axis=0))
+
+    def get_combined_y_factorials(self,dim=0,start_end=[(0,None)]):
+        return(np.prod([self.get_y_factorial_prod_between(start,end,dim) for start,end in start_end],axis=0))
 
     def get_combined_x_sums(self,start_end=[(0,None)]):
         return(np.sum([self.get_x_sum_between(start,end) for start,end in start_end],axis=0))
